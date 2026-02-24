@@ -134,7 +134,7 @@ LLMAccountPool/
 - `ServerPort`: 服务端口（默认 8080）
 - `JWT_SECRET`: JWT 密钥
 - `AdminUsername`: 管理员用户名
-- `AdminPassword`: 管理员密码（MD5 加密）
+- `AdminPassword`: 管理员密码（Argon2id 加密存储）
 
 ## License
 

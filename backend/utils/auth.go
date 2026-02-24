@@ -1,20 +1,48 @@
 package utils
 
 import (
+	"crypto/rand"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/crypto/argon2"
 )
 
 func HashPassword(password string) (string, error) {
-	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
-	return string(bytes), err
+	salt := generateSalt()
+	hash := argon2.IDKey([]byte(password), salt, 1, 64*1024, 4, 32)
+	return encodeHash(salt, hash), nil
 }
 
-func CheckPassword(password, hash string) bool {
-	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
-	return err == nil
+func CheckPassword(password, encodedHash string) bool {
+	salt, hash := decodeHash(encodedHash)
+	if salt == nil || hash == nil {
+		return false
+	}
+	newHash := argon2.IDKey([]byte(password), salt, 1, 64*1024, 4, 32)
+	return string(hash) == string(newHash)
+}
+
+func generateSalt() []byte {
+	salt := make([]byte, 16)
+	rand.Read(salt)
+	return salt
+}
+
+func encodeHash(salt, hash []byte) string {
+	encoded := make([]byte, len(salt)+len(hash))
+	copy(encoded, salt)
+	copy(encoded[len(salt):], hash)
+	return string(encoded)
+}
+
+func decodeHash(encoded string) ([]byte, []byte) {
+	if len(encoded) < 16 {
+		return nil, nil
+	}
+	salt := []byte(encoded[:16])
+	hash := []byte(encoded[16:])
+	return salt, hash
 }
 
 func GenerateJWT(secret string, userID uint) (string, error) {
