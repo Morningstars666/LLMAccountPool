@@ -25,20 +25,38 @@ LLM API 调用号池管理系统。该系统作为中间层代理，统一管理
 
 ## 快速开始
 
-### 编译运行
+## 环境配置
+
+启动前需要配置以下环境变量：
+
+| 环境变量 | 必填 | 默认值 | 说明 |
+|---------|------|--------|------|
+| `JWT_SECRET` | 是 | - | JWT 签名密钥，建议使用随机字符串 |
+| `SERVER_PORT` | 否 | 8080 | 服务监听端口 |
+| `DATABASE_URL` | 否 | ../data/llmaccountpool.db | 数据库文件路径 |
+| `ALLOWED_ORIGINS` | 否 | - | 允许的跨域来源，多个用逗号分隔 |
+| `MAX_LOGIN_ATTEMPTS` | 否 | 5 | 最大登录失败次数 |
+| `LOCKOUT_DURATION` | 否 | 15 | 登录锁定时长（分钟） |
+
+### 启动命令
 
 ```bash
+# Linux/macOS
+export JWT_SECRET="your-secret-key"
 cd backend
-go build -o llmaccountpool.exe
-./llmaccountpool.exe
+go run main.go
+
+# Windows (PowerShell)
+$env:JWT_SECRET="your-secret-key"
+cd backend
+go run main.go
 ```
 
-服务启动后访问 `http://localhost:8080`
+或者使用 .env 文件（需自行加载）：
 
-### 默认账号
-
-- 用户名：`admin`
-- 密码：`admin`
+```bash
+JWT_SECRET=your-secret-key go run main.go
+```
 
 ## API 接口
 
