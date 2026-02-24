@@ -259,6 +259,7 @@ let models = [];
 let sources = [];
 let apiKeys = [];
 let usageStats = null;
+let serverInfo = null;
 
 async function loadPageData(page) {
     switch(page) {
@@ -282,6 +283,9 @@ async function loadPageData(page) {
 
 async function loadDashboard() {
     try {
+        serverInfo = await apiRequest('/api/admin/server-info');
+        document.getElementById('proxy-url').textContent = serverInfo.proxy_url;
+
         const data = await apiRequest('/api/admin/usage');
         usageStats = data;
         
@@ -666,6 +670,20 @@ function openModal(id) {
 
 function closeModal(id) {
     document.getElementById(id).classList.remove('active');
+}
+
+async function copyProxyURL() {
+    const proxyURL = document.getElementById('proxy-url').textContent;
+    if (!proxyURL || proxyURL === '加载中...') {
+        showError('代理地址加载中，请稍候');
+        return;
+    }
+    try {
+        await navigator.clipboard.writeText(proxyURL);
+        showSuccess('代理地址已复制到剪贴板');
+    } catch (error) {
+        showError('复制失败，请手动复制');
+    }
 }
 
 if (token) {

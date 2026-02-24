@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"io"
 	"llmaccountpool/config"
 	"llmaccountpool/handlers"
@@ -9,9 +11,45 @@ import (
 	"llmaccountpool/services"
 	"net/http"
 	"os"
+	"path/filepath"
+	"sync"
 
 	"github.com/gin-gonic/gin"
 )
+
+var fileHashes map[string]string
+var hashOnce sync.Once
+
+func getFileHash(filePath string) string {
+	hashOnce.Do(func() {
+		fileHashes = make(map[string]string)
+	})
+
+	if hash, ok := fileHashes[filePath]; ok {
+		return hash
+	}
+
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return ""
+	}
+
+	hash := sha256.Sum256(data)
+	hashStr := hex.EncodeToString(hash[:])[:8]
+	fileHashes[filePath] = hashStr
+	return hashStr
+}
+
+func getStaticFileVersion() map[string]string {
+	wd, _ := os.Getwd()
+	cssPath := filepath.Join(wd, "../frontend/css/style.css")
+	jsPath := filepath.Join(wd, "../frontend/js/app.js")
+
+	return map[string]string{
+		"css": getFileHash(cssPath),
+		"js":  getFileHash(jsPath),
+	}
+}
 
 func main() {
 	cfg := config.LoadConfig()
@@ -26,7 +64,15 @@ func main() {
 	r.LoadHTMLGlob("../frontend/*.html")
 
 	r.GET("/", func(c *gin.Context) {
-		c.HTML(http.StatusOK, "index.html", nil)
+		versions := getStaticFileVersion()
+		c.HTML(http.StatusOK, "index.html", gin.H{
+			"cssVersion": versions["css"],
+			"jsVersion":  versions["js"],
+		})
+	})
+
+	r.GET("/api/static-versions", func(c *gin.Context) {
+		c.JSON(http.StatusOK, getStaticFileVersion())
 	})
 
 	r.Static("/static/css", "../frontend/css")
@@ -67,6 +113,9 @@ func main() {
 
 		admin.GET("/usage", handlers.GetUsageStats)
 		admin.GET("/usage/records", handlers.GetUsageRecords)
+		admin.GET("/server-info", func(c *gin.Context) {
+			handlers.GetServerInfo(c, cfg)
+		})
 	}
 
 	r.POST("/v1/chat/completions", func(c *gin.Context) {

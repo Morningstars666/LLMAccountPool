@@ -8,6 +8,7 @@ import (
 
 type Config struct {
 	ServerPort       string
+	ServerHost       string
 	DatabaseURL      string
 	JWTSecret        string
 	AllowedOrigins   []string
@@ -32,6 +33,7 @@ func LoadConfig() *Config {
 
 	return &Config{
 		ServerPort:       getEnv("SERVER_PORT", "8080"),
+		ServerHost:       getEnv("SERVER_HOST", "http://localhost:8080"),
 		DatabaseURL:      getEnv("DATABASE_URL", "../data/llmaccountpool.db"),
 		JWTSecret:        jwtSecret,
 		AllowedOrigins:   allowedOrigins,

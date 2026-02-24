@@ -1,11 +1,17 @@
 package handlers
 
 import (
+	"llmaccountpool/config"
 	"llmaccountpool/models"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
+
+type ServerInfoResponse struct {
+	ServerHost string `json:"server_host"`
+	ProxyURL   string `json:"proxy_url"`
+}
 
 type UsageResponse struct {
 	APIKeyStats []APIKeyUsageStat `json:"api_key_stats"`
@@ -128,4 +134,13 @@ func GetUsageRecords(c *gin.Context) {
 	query.Order("created_at desc").Limit(100).Find(&records)
 
 	c.JSON(http.StatusOK, records)
+}
+
+func GetServerInfo(c *gin.Context, cfg *config.Config) {
+	proxyURL := cfg.ServerHost + "/v1/chat/completions"
+	response := ServerInfoResponse{
+		ServerHost: cfg.ServerHost,
+		ProxyURL:   proxyURL,
+	}
+	c.JSON(http.StatusOK, response)
 }

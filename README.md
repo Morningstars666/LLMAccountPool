@@ -33,6 +33,7 @@ LLM API 调用号池管理系统。该系统作为中间层代理，统一管理
 |---------|------|--------|------|
 | `JWT_SECRET` | 是 | - | JWT 签名密钥，建议使用随机字符串 |
 | `SERVER_PORT` | 否 | 8080 | 服务监听端口 |
+| `SERVER_HOST` | 否 | http://localhost:8080 | 服务器地址，用于生成代理地址 |
 | `DATABASE_URL` | 否 | ../data/llmaccountpool.db | 数据库文件路径 |
 | `ALLOWED_ORIGINS` | 否 | - | 允许的跨域来源，多个用逗号分隔 |
 | `MAX_LOGIN_ATTEMPTS` | 否 | 5 | 最大登录失败次数 |
@@ -100,6 +101,7 @@ JWT_SECRET=your-secret-key go run main.go
 
 - `GET /api/admin/usage` - 获取用量统计
 - `GET /api/admin/usage/records` - 获取用量记录
+- `GET /api/admin/server-info` - 获取服务器信息（包括代理地址）
 
 ### 代理接口
 
