@@ -3,7 +3,6 @@ package main
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"io"
 	"llmaccountpool/config"
 	"llmaccountpool/handlers"
 	"llmaccountpool/middleware"
@@ -118,25 +117,10 @@ func main() {
 		})
 	}
 
-	r.POST("/v1/chat/completions", func(c *gin.Context) {
-		apiKey := c.GetHeader("Authorization")
-		if apiKey == "" {
-			apiKey = c.Query("key")
-		}
-		apiKey = apiKey[len("Bearer "):]
-
-		body, _ := io.ReadAll(c.Request.Body)
-
-		statusCode, respBody, err := services.Proxy.HandleChatCompletion(apiKey, body)
-		if err != nil {
-			c.JSON(statusCode, gin.H{"error": err.Error()})
-			return
-		}
-
-		c.Data(statusCode, "application/json", respBody)
-	})
+	r.POST("/v1/chat/completions", handlers.HandleChatCompletions)
 
 	port := cfg.ServerPort
+
 	if port == "" {
 		port = "8080"
 	}
