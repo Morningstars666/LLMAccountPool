@@ -146,7 +146,8 @@ document.getElementById('change-password-form').addEventListener('submit', async
     try {
         await apiRequest('/api/admin/change-password', 'POST', {
             old_password: oldPassword,
-            new_password: newPassword
+            new_password: newPassword,
+            confirm_password: confirmPassword
         });
         showSuccess('密码修改成功，请重新登录');
         setTimeout(() => {
