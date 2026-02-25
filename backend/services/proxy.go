@@ -122,6 +122,7 @@ func (p *ProxyService) handleNonStreamRequest(
 	respBody, statusCode, err := p.forwardRequestBytes(source.APIURL, source.APIKey, reqBody)
 
 	if err != nil {
+		p.updateUsage(source.ID, 0)
 		p.recordUsage(apiKeyRecord.ID, externalModel.ID, source.ID, externalModel.Model, 0, 0, false)
 
 		result := p.tryOtherSources(c, apiKey, reqBody, externalModel, sources, sourceIndex, apiKeyRecord)
@@ -171,6 +172,7 @@ func (p *ProxyService) handleStreamRequest(
 	resp, err := p.forwardRequest(source.APIURL, source.APIKey, reqBody, true)
 
 	if err != nil {
+		p.updateUsage(source.ID, 0)
 		p.recordUsage(apiKeyRecord.ID, externalModel.ID, source.ID, externalModel.Model, 0, 0, false)
 
 		result := p.tryOtherSources(c, apiKey, reqBody, externalModel, sources, sourceIndex, apiKeyRecord)
@@ -266,6 +268,7 @@ func (p *ProxyService) tryOtherSources(
 
 		respBody, statusCode, err := p.forwardRequestBytes(nextSource.APIURL, nextSource.APIKey, modifiedReq)
 		if err != nil {
+			p.updateUsage(nextSource.ID, 0)
 			p.recordUsage(apiKeyRecord.ID, externalModel.ID, nextSource.ID, externalModel.Model, 0, 0, false)
 			continue
 		}
