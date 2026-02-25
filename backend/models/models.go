@@ -56,7 +56,7 @@ type APIKey struct {
 	DeletedAt       gorm.DeletedAt `gorm:"index" json:"-"`
 	Key             string         `gorm:"unique;not null" json:"key"`
 	Note            string         `json:"note"`
-	ExternalModelID uint           `gorm:"not null" json:"external_model_id"`
+	ExternalModelID uint           `gorm:"default:0" json:"external_model_id"`
 	UsedCount       int64          `gorm:"default:0" json:"used_count"`
 	UsedTokens      int64          `gorm:"default:0" json:"used_tokens"`
 	InputTokens     int64          `gorm:"default:0" json:"input_tokens"`

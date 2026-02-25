@@ -9,7 +9,7 @@ import (
 )
 
 type APIKeyRequest struct {
-	ExternalModelID uint   `json:"external_model_id" binding:"required"`
+	ExternalModelID *uint  `json:"external_model_id"`
 	Note            string `json:"note"`
 }
 
@@ -19,7 +19,37 @@ func GetAPIKeys(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch API keys"})
 		return
 	}
-	c.JSON(http.StatusOK, keys)
+
+	type APIKeyResponse struct {
+		ID              uint   `json:"id"`
+		CreatedAt       string `json:"created_at"`
+		UpdatedAt       string `json:"updated_at"`
+		Key             string `json:"key"`
+		Note            string `json:"note"`
+		ExternalModelID uint   `json:"external_model_id"`
+		UsedCount       int64  `json:"used_count"`
+		UsedTokens      int64  `json:"used_tokens"`
+		InputTokens     int64  `json:"input_tokens"`
+		OutputTokens    int64  `json:"output_tokens"`
+	}
+
+	response := make([]APIKeyResponse, len(keys))
+	for i, key := range keys {
+		response[i] = APIKeyResponse{
+			ID:              key.ID,
+			CreatedAt:       key.CreatedAt.Format("2006-01-02 15:04:05"),
+			UpdatedAt:       key.UpdatedAt.Format("2006-01-02 15:04:05"),
+			Key:             key.Key,
+			Note:            key.Note,
+			ExternalModelID: key.ExternalModelID,
+			UsedCount:       key.UsedCount,
+			UsedTokens:      key.UsedTokens,
+			InputTokens:     key.InputTokens,
+			OutputTokens:    key.OutputTokens,
+		}
+	}
+
+	c.JSON(http.StatusOK, response)
 }
 
 func CreateAPIKey(c *gin.Context) {
@@ -29,10 +59,22 @@ func CreateAPIKey(c *gin.Context) {
 		return
 	}
 
+	if req.ExternalModelID != nil {
+		var model models.ExternalModel
+		if err := models.DB.First(&model, *req.ExternalModelID).Error; err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Model not found"})
+			return
+		}
+	}
+
 	key := models.APIKey{
 		Key:             "sk-" + uuid.New().String(),
 		Note:            req.Note,
-		ExternalModelID: req.ExternalModelID,
+		ExternalModelID: 0,
+	}
+
+	if req.ExternalModelID != nil {
+		key.ExternalModelID = *req.ExternalModelID
 	}
 
 	if err := models.DB.Create(&key).Error; err != nil {

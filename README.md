@@ -93,9 +93,11 @@ JWT_SECRET=your-secret-key go run main.go
 ### API Key 管理
 
 - `GET /api/admin/keys` - 获取 API Key 列表
-- `POST /api/admin/keys` - 创建 API Key
+- `POST /api/admin/keys` - 创建 API Key（`external_model_id` 为空或 0 时表示可访问全部模型）
 - `DELETE /api/admin/keys/:id` - 删除 API Key
 - `POST /api/admin/keys/:id/reset` - 重置 API Key 用量
+
+> **说明**：创建 API Key 时，可以选择绑定特定模型或留空（访问全部模型）。绑定特定模型时，该 key 只能用于访问对应模型；留空时，可以根据请求中的 model 名称自动匹配可用模型。
 
 ### 用量统计
 

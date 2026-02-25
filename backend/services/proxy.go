@@ -71,9 +71,17 @@ func (p *ProxyService) HandleChatCompletion(c *gin.Context, apiKey string, reqBo
 	}
 
 	var externalModel models.ExternalModel
-	if err := models.DB.Preload("Sources").First(&externalModel, apiKeyRecord.ExternalModelID).Error; err != nil {
-		utils.RespondWithNotFoundError(c, "Model not found", utils.StringPtr("model"))
-		return
+	if apiKeyRecord.ExternalModelID != 0 {
+		if err := models.DB.Preload("Sources").First(&externalModel, apiKeyRecord.ExternalModelID).Error; err != nil {
+			utils.RespondWithNotFoundError(c, "Model not found", utils.StringPtr("model"))
+			return
+		}
+	} else {
+		modelName := chatReq.Model
+		if err := models.DB.Preload("Sources").Where("model = ?", modelName).First(&externalModel).Error; err != nil {
+			utils.RespondWithNotFoundError(c, "Model not found", utils.StringPtr("model"))
+			return
+		}
 	}
 
 	sources := p.getActiveSources(&externalModel)

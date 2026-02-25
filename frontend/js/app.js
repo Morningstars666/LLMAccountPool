@@ -384,7 +384,7 @@ async function loadKeys() {
             <tr>
                 <td><code>${k.key}</code></td>
                 <td>${k.note || '-'}</td>
-                <td>${modelMap[k.external_model_id] || '-'}</td>
+                <td>${k.external_model_id === 0 ? '全部模型' : (modelMap[k.external_model_id] || '-')}</td>
                 <td>${k.used_count}</td>
                 <td>${k.input_tokens}</td>
                 <td>${k.output_tokens}</td>
@@ -609,7 +609,7 @@ document.getElementById('source-name-form').addEventListener('submit', async (e)
 document.getElementById('add-key-btn').addEventListener('click', async () => {
     const models = await apiRequest('/api/admin/models');
     const select = document.getElementById('key-model-id');
-    select.innerHTML = '<option value="">请选择模型</option>' + 
+    select.innerHTML = '<option value="">全部模型</option>' + 
         models.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
     
     document.getElementById('key-form').reset();
@@ -640,8 +640,9 @@ async function resetKey(id) {
 
 document.getElementById('key-form').addEventListener('submit', async (e) => {
     e.preventDefault();
+    const modelId = document.getElementById('key-model-id').value;
     const data = {
-        external_model_id: parseInt(document.getElementById('key-model-id').value),
+        external_model_id: modelId ? parseInt(modelId) : null,
         note: document.getElementById('key-note').value
     };
     
