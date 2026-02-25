@@ -665,6 +665,131 @@ document.getElementById('logout-btn').addEventListener('click', () => {
     showLogin();
 });
 
+document.getElementById('import-models-btn').addEventListener('click', () => {
+    document.getElementById('import-form').reset();
+    document.getElementById('import-result').classList.add('hidden');
+    openModal('import-modal');
+});
+
+document.getElementById('import-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fileInput = document.getElementById('import-file');
+    const file = fileInput.files[0];
+    if (!file) {
+        showError('请选择文件');
+        return;
+    }
+
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    submitBtn.textContent = '导入中...';
+
+    try {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const headers = {};
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const response = await fetch(`${API_BASE}/api/admin/models/import`, {
+            method: 'POST',
+            headers: headers,
+            body: formData
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || '导入失败');
+        }
+
+        const result = data.result;
+        let resultHtml = `
+            <div class="result-title">导入结果</div>
+            <div class="result-item"><span>新建</span><span class="value">${result.external_models_created}</span></div>
+            <div class="result-item"><span>更新对外模型</span><span class="value">${result.external_models_updated}</span></div>
+            <div class="result-item"><span>新建上游模型</span><span class="value">${result.sources_created}</span></div>
+            <div class="result-item"><span>更新上游模型</span><span class="value">${result.sources_updated}</span></div>
+        `;
+
+        if (result.errors && result.errors.length > 0) {
+            resultHtml += `<div class="errors"><div class="result-title" style="color: var(--danger);">错误</div>`;
+            result.errors.forEach(err => {
+                resultHtml += `<div class="error-item">${escapeHtml(err)}</div>`;
+            });
+            resultHtml += `</div>`;
+        }
+
+        if (result.skipped && result.skipped.length > 0) {
+            resultHtml += `<div class="skipped"><div class="result-title" style="color: var(--warning);">跳过</div>`;
+            result.skipped.forEach(s => {
+                resultHtml += `<div class="skipped-item">${escapeHtml(s)}</div>`;
+            });
+            resultHtml += `</div>`;
+        }
+
+        document.getElementById('import-result').innerHTML = resultHtml;
+        document.getElementById('import-result').classList.remove('hidden');
+
+        if (result.errors && result.errors.length === 0) {
+            showSuccess('导入成功');
+            await loadModels();
+            await loadSources();
+            submitBtn.textContent = '导入成功';
+        } else if (result.errors && result.errors.length > 0) {
+            showError('导入完成，但有错误');
+            submitBtn.disabled = false;
+            submitBtn.textContent = '导入';
+        }
+    } catch (error) {
+        showError(error.message);
+        submitBtn.disabled = false;
+        submitBtn.textContent = '导入';
+    }
+});
+
+async function downloadTemplate() {
+    try {
+        const response = await fetch(`${API_BASE}/api/admin/models/template`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        const contentType = response.headers.get('content-type') || '';
+        
+        if (!response.ok) {
+            if (contentType.includes('application/json')) {
+                const data = await response.json();
+                throw new Error(data.error || '下载失败');
+            } else {
+                throw new Error('下载失败: ' + response.status);
+            }
+        }
+
+        if (!contentType.includes('application/vnd.openxmlformats-officedocument') && 
+            !contentType.includes('application/octet-stream')) {
+            const text = await response.text();
+            console.error('Unexpected response:', text);
+            throw new Error('服务器返回了非文件响应');
+        }
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'models_template.xlsx';
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+    } catch (error) {
+        showError(error.message);
+    }
+}
+
 function openModal(id) {
     document.getElementById(id).classList.add('active');
 }
