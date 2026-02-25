@@ -79,6 +79,44 @@ JWT_SECRET=your-secret-key go run main.go
 - `POST /api/admin/models` - 创建模型
 - `PUT /api/admin/models/:id` - 更新模型
 - `DELETE /api/admin/models/:id` - 删除模型
+- `GET /api/admin/models/template` - 下载Excel导入模板
+- `POST /api/admin/models/import` - 从Excel批量导入模型
+
+#### Excel 批量导入
+
+系统支持通过 Excel 文件批量导入对外模型和上游模型：
+
+1. **下载模板**：`GET /api/admin/models/template`
+2. **导入模型**：`POST /api/admin/models/import`，通过 form-data 上传 xlsx 文件
+
+**模板说明**：
+
+Excel 文件包含两个工作表：
+
+| 对外模型 sheet | | |
+|---------------|---|---|
+| 字段 | 必填 | 说明 |
+| Name | 是 | 对外模型名称 |
+| Model | 是 | 对外模型标识 |
+| Strategy | 否 | 策略 (round_robin/sequential)，默认为 round_robin |
+
+| 上游模型 sheet | | |
+|---------------|---|---|
+| 字段 | 必填 | 说明 |
+| ExternalModelName | 是 | 对应的对外模型名称 |
+| Name | 是 | 上游模型名称 |
+| APIURL | 是 | 上游 API 地址 |
+| APIKey | 是 | 上游 API Key |
+| ModelName | 是 | 上游模型名称 |
+| BillingMode | 否 | 计费模式 (count/tokens)，默认为 count |
+| LimitCount | 否 | 调用次数限制 |
+| LimitTokens | 否 | Token 限制 |
+| LimitResetInterval | 否 | 重置间隔（秒） |
+| IsActive | 否 | 是否启用 (true/false)，默认为 true |
+
+**导入规则**：
+- 对外模型：名称相同时更新，不存在则创建
+- 上游模型：根据对外模型名称+上游模型名称匹配，存在则更新，不存在则创建
 
 ### 请求源管理
 
