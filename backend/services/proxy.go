@@ -122,8 +122,7 @@ func (p *ProxyService) handleNonStreamRequest(
 	respBody, statusCode, err := p.forwardRequestBytes(source.APIURL, source.APIKey, reqBody)
 
 	if err != nil {
-		p.updateUsage(source.ID, 0)
-		p.recordUsage(apiKeyRecord.ID, externalModel.ID, source.ID, externalModel.Model, 0, 0, false)
+		p.recordUsageInTransaction(models.DB, apiKeyRecord.ID, externalModel.ID, source.ID, externalModel.Model, 0, 0, false)
 
 		result := p.tryOtherSources(c, apiKey, reqBody, externalModel, sources, sourceIndex, apiKeyRecord)
 		if result == nil {
@@ -149,8 +148,12 @@ func (p *ProxyService) handleNonStreamRequest(
 		outputTokens = int64(chatResp.Usage.CompletionTokens)
 	}
 
-	p.updateUsage(source.ID, inputTokens+outputTokens)
-	p.recordUsage(apiKeyRecord.ID, externalModel.ID, source.ID, externalModel.Model, inputTokens, outputTokens, true)
+	err = models.DB.Transaction(func(tx *gorm.DB) error {
+		return p.recordUsageInTransaction(tx, apiKeyRecord.ID, externalModel.ID, source.ID, externalModel.Model, inputTokens, outputTokens, true)
+	})
+	if err != nil {
+		fmt.Printf("Failed to record usage: %v\n", err)
+	}
 
 	if externalModel.Strategy == "round_robin" {
 		p.updateRoundRobinIndex(externalModel.ID, len(sources))
@@ -172,8 +175,7 @@ func (p *ProxyService) handleStreamRequest(
 	resp, err := p.forwardRequest(source.APIURL, source.APIKey, reqBody, true)
 
 	if err != nil {
-		p.updateUsage(source.ID, 0)
-		p.recordUsage(apiKeyRecord.ID, externalModel.ID, source.ID, externalModel.Model, 0, 0, false)
+		p.recordUsageInTransaction(models.DB, apiKeyRecord.ID, externalModel.ID, source.ID, externalModel.Model, 0, 0, false)
 
 		result := p.tryOtherSources(c, apiKey, reqBody, externalModel, sources, sourceIndex, apiKeyRecord)
 		if result == nil {
@@ -185,10 +187,6 @@ func (p *ProxyService) handleStreamRequest(
 	}
 
 	defer resp.Body.Close()
-
-	if externalModel.Strategy == "round_robin" {
-		p.updateRoundRobinIndex(externalModel.ID, len(sources))
-	}
 
 	c.Header("Content-Type", "text/event-stream")
 	c.Header("Cache-Control", "no-cache")
@@ -240,8 +238,16 @@ func (p *ProxyService) handleStreamRequest(
 		totalOutputTokens = 1
 	}
 
-	p.updateUsage(source.ID, totalInputTokens+totalOutputTokens)
-	p.recordUsage(apiKeyRecord.ID, externalModel.ID, source.ID, externalModel.Model, totalInputTokens, totalOutputTokens, true)
+	err = models.DB.Transaction(func(tx *gorm.DB) error {
+		return p.recordUsageInTransaction(tx, apiKeyRecord.ID, externalModel.ID, source.ID, externalModel.Model, totalInputTokens, totalOutputTokens, true)
+	})
+	if err != nil {
+		fmt.Printf("Failed to record usage: %v\n", err)
+	}
+
+	if externalModel.Strategy == "round_robin" {
+		p.updateRoundRobinIndex(externalModel.ID, len(sources))
+	}
 }
 
 func (p *ProxyService) tryOtherSources(
@@ -268,8 +274,7 @@ func (p *ProxyService) tryOtherSources(
 
 		respBody, statusCode, err := p.forwardRequestBytes(nextSource.APIURL, nextSource.APIKey, modifiedReq)
 		if err != nil {
-			p.updateUsage(nextSource.ID, 0)
-			p.recordUsage(apiKeyRecord.ID, externalModel.ID, nextSource.ID, externalModel.Model, 0, 0, false)
+			p.recordUsageInTransaction(models.DB, apiKeyRecord.ID, externalModel.ID, nextSource.ID, externalModel.Model, 0, 0, false)
 			continue
 		}
 
@@ -281,8 +286,16 @@ func (p *ProxyService) tryOtherSources(
 			outputTokens = int64(chatResp.Usage.CompletionTokens)
 		}
 
-		p.updateUsage(nextSource.ID, inputTokens+outputTokens)
-		p.recordUsage(apiKeyRecord.ID, externalModel.ID, nextSource.ID, externalModel.Model, inputTokens, outputTokens, true)
+		err = models.DB.Transaction(func(tx *gorm.DB) error {
+			return p.recordUsageInTransaction(tx, apiKeyRecord.ID, externalModel.ID, nextSource.ID, externalModel.Model, inputTokens, outputTokens, true)
+		})
+		if err != nil {
+			fmt.Printf("Failed to record usage: %v\n", err)
+		}
+
+		if externalModel.Strategy == "round_robin" {
+			p.updateRoundRobinIndex(externalModel.ID, len(sources))
+		}
 
 		c.Data(statusCode, "application/json", respBody)
 		return nil
@@ -470,6 +483,40 @@ func (p *ProxyService) recordUsage(apiKeyID, modelID, sourceID uint, modelName s
 	if err != nil {
 		fmt.Printf("Failed to record usage: %v\n", err)
 	}
+}
+
+func (p *ProxyService) recordUsageInTransaction(tx *gorm.DB, apiKeyID, modelID, sourceID uint, modelName string, inputTokens, outputTokens int64, success bool) error {
+	record := models.UsageRecord{
+		APIKeyID:        apiKeyID,
+		ExternalModelID: modelID,
+		SourceID:        sourceID,
+		Model:           modelName,
+		InputTokens:     inputTokens,
+		OutputTokens:    outputTokens,
+		Success:         success,
+	}
+
+	if err := tx.Create(&record).Error; err != nil {
+		return err
+	}
+
+	if err := tx.Model(&models.RequestSource{}).Where("id = ?", sourceID).Updates(map[string]interface{}{
+		"used_count":  gorm.Expr("used_count + ?", 1),
+		"used_tokens": gorm.Expr("used_tokens + ?", inputTokens+outputTokens),
+	}).Error; err != nil {
+		return err
+	}
+
+	if err := tx.Model(&models.APIKey{}).Where("id = ?", apiKeyID).Updates(map[string]interface{}{
+		"used_count":    gorm.Expr("used_count + 1"),
+		"used_tokens":   gorm.Expr("used_tokens + ?", inputTokens+outputTokens),
+		"input_tokens":  gorm.Expr("input_tokens + ?", inputTokens),
+		"output_tokens": gorm.Expr("output_tokens + ?", outputTokens),
+	}).Error; err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (p *ProxyService) modifyRequest(reqBody []byte, modelName string) ([]byte, error) {
