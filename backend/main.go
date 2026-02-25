@@ -96,6 +96,8 @@ func main() {
 		admin.POST("/models", handlers.CreateExternalModel)
 		admin.PUT("/models/:id", handlers.UpdateExternalModel)
 		admin.DELETE("/models/:id", handlers.DeleteExternalModel)
+		admin.POST("/models/import", handlers.ImportModelsFromExcel)
+		admin.GET("/models/template", handlers.DownloadTemplate)
 
 		admin.GET("/sources", handlers.GetRequestSources)
 		admin.GET("/sources/:id", handlers.GetRequestSource)

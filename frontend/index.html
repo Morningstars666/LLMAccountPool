@@ -109,7 +109,10 @@
                 <div class="card">
                     <div class="card-header">
                         <h3>模型列表</h3>
-                        <button class="btn btn-primary btn-sm" id="add-model-btn">添加模型</button>
+                        <div>
+                            <button class="btn btn-secondary btn-sm" id="import-models-btn">导入xlsx</button>
+                            <button class="btn btn-primary btn-sm" id="add-model-btn">添加模型</button>
+                        </div>
                     </div>
                     <div class="table-container">
                         <table>
@@ -402,6 +405,27 @@
                 <div class="modal-actions">
                     <button type="button" class="btn btn-secondary" onclick="closeModal('source-name-modal')">取消</button>
                     <button type="submit" class="btn btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="import-modal">
+        <div class="modal">
+            <h2>导入模型</h2>
+            <p style="margin-bottom: 15px; color: #666;">
+                请上传 xlsx 文件，支持导入对外模型和上游模型。<br>
+                <a href="javascript:void(0)" onclick="downloadTemplate()" style="color: #1890ff;">下载模板文件</a>
+            </p>
+            <form id="import-form">
+                <div class="form-group">
+                    <label>选择文件</label>
+                    <input type="file" id="import-file" accept=".xlsx,.xls" required>
+                </div>
+                <div id="import-result" class="import-result hidden"></div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('import-modal')">取消</button>
+                    <button type="submit" class="btn btn-primary">导入</button>
                 </div>
             </form>
         </div>

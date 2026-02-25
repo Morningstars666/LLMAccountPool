@@ -1001,3 +1001,48 @@ td code:hover {
         font-size: 0.75rem;
     }
 }
+
+.import-result {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-top: 1rem;
+    font-size: 0.875rem;
+}
+
+.import-result .result-title {
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: var(--text-primary);
+}
+
+.import-result .result-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.25rem 0;
+    color: var(--text-secondary);
+}
+
+.import-result .result-item .value {
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.import-result .errors,
+.import-result .skipped {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border-light);
+}
+
+.import-result .error-item,
+.import-result .skipped-item {
+    color: var(--danger);
+    font-size: 0.8125rem;
+    padding: 0.125rem 0;
+}
+
+.import-result .skipped-item {
+    color: var(--warning);
+}
