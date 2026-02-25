@@ -316,8 +316,28 @@ async function loadModels() {
         const tbody = document.getElementById('models-table');
         tbody.innerHTML = models.map(m => `
             <tr>
-                <td>${m.name}</td>
-                <td><code>${m.model}</code></td>
+                <td>
+                    <div class="model-name-cell">
+                        <span class="model-name">${m.name}</span>
+                        <button class="btn btn-icon btn-copy" onclick="copyText('${escapeHtml(m.name).replace(/'/g, "\\'")}')" title="复制名称">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="5" y="5" width="9" height="9" rx="1"></rect>
+                                <path d="M2 11V3a1 1 0 0 1 1-1h8"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </td>
+                <td>
+                    <div class="model-name-cell">
+                        <code>${m.model}</code>
+                        <button class="btn btn-icon btn-copy" onclick="copyText('${m.model}')" title="复制标识">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="5" y="5" width="9" height="9" rx="1"></rect>
+                                <path d="M2 11V3a1 1 0 0 1 1-1h8"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </td>
                 <td>${m.strategy === 'round_robin' ? '轮询' : '用完切换'}</td>
                 <td>${m.sources?.length || 0}</td>
                 <td>
@@ -382,7 +402,31 @@ async function loadKeys() {
         const tbody = document.getElementById('keys-table');
         tbody.innerHTML = apiKeys.map(k => `
             <tr>
-                <td><code>${k.key}</code></td>
+                <td>
+                    <div class="api-key-cell">
+                        <code class="api-key-text" data-key="${k.key}" data-shown="false">${maskKey(k.key)}</code>
+                        <button class="btn btn-icon btn-copy" onclick="copyKey('${k.key}')" title="复制">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="5" y="5" width="9" height="9" rx="1"></rect>
+                                <path d="M2 11V3a1 1 0 0 1 1-1h8"></path>
+                            </svg>
+                        </button>
+                        <button class="btn btn-icon btn-toggle" onclick="toggleKeyVisibility(this, '${k.key}')" title="显示/隐藏">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" class="icon-eye">
+                                <path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z"></path>
+                                <circle cx="8" cy="8" r="2"></circle>
+                            </svg>
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" class="icon-eye-off hidden">
+                                <path d="M1 1l14 14"></path>
+                                <path d="M10.5 5.5c1.5-1 3.5-1 5 0"></path>
+                                <path d="M1 8s2.5-5 7-5c1.5 0 2.5.5 3.5 1.5"></path>
+                                <path d="M14 14L2 2"></path>
+                                <path d="M8.5 10.5c-1.5 1-3.5 1-5 0"></path>
+                                <path d="M14 3.5C12.5 2.5 10.5 2.5 9 3.5"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </td>
                 <td>${k.note || '-'}</td>
                 <td>${k.external_model_id === 0 ? '全部模型' : (modelMap[k.external_model_id] || '-')}</td>
                 <td>${k.used_count}</td>
@@ -810,6 +854,63 @@ async function copyProxyURL() {
     } catch (error) {
         showError('复制失败，请手动复制');
     }
+}
+
+function maskKey(key) {
+    if (key.length <= 8) {
+        return '*'.repeat(key.length);
+    }
+    return key.substring(0, 4) + '*'.repeat(key.length - 8) + key.substring(key.length - 4);
+}
+
+function toggleKeyVisibility(btn, key) {
+    const iconEye = btn.querySelector('.icon-eye');
+    const iconEyeOff = btn.querySelector('.icon-eye-off');
+    const row = btn.closest('tr');
+    const keyText = row.querySelector('.api-key-text');
+    
+    if (keyText.dataset.shown === 'true') {
+        keyText.textContent = maskKey(key);
+        keyText.dataset.shown = 'false';
+        iconEye.classList.remove('hidden');
+        iconEyeOff.classList.add('hidden');
+    } else {
+        keyText.textContent = key;
+        keyText.dataset.shown = 'true';
+        iconEye.classList.add('hidden');
+        iconEyeOff.classList.remove('hidden');
+    }
+}
+
+async function copyKey(key) {
+    try {
+        await navigator.clipboard.writeText(key);
+        showSuccess('API Key 已复制到剪贴板');
+    } catch (error) {
+        showError('复制失败，请手动复制');
+    }
+}
+
+async function copyToClipboard(text) {
+    try {
+        await navigator.clipboard.writeText(text);
+        showSuccess('已复制到剪贴板');
+    } catch (error) {
+        showError('复制失败，请手动复制');
+    }
+}
+
+let newGeneratedKey = '';
+
+function copyNewKey() {
+    const keyText = document.getElementById('new-key-display').textContent;
+    if (keyText) {
+        copyToClipboard(keyText);
+    }
+}
+
+function copyText(text) {
+    copyToClipboard(text);
 }
 
 if (token) {

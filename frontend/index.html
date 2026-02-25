@@ -385,10 +385,16 @@
     <div class="modal-overlay" id="key-display-modal">
         <div class="modal">
             <h2>API Key 已生成</h2>
-            <p>请妥善保存以下 Key，关闭后将无法再次查看：</p>
             <div class="api-key-display" id="new-key-display"></div>
             <div class="modal-actions">
-                <button class="btn btn-primary" onclick="closeModal('key-display-modal')">我已保存</button>
+                <button class="btn btn-secondary" onclick="copyNewKey()">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="5" y="5" width="9" height="9" rx="1"></rect>
+                        <path d="M2 11V3a1 1 0 0 1 1-1h8"></path>
+                    </svg>
+                    复制
+                </button>
+                <button class="btn btn-primary" onclick="closeModal('key-display-modal')">关闭</button>
             </div>
         </div>
     </div>
