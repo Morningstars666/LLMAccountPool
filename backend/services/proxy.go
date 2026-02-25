@@ -17,17 +17,14 @@ import (
 	"gorm.io/gorm"
 )
 
-// ProxyService 代理服务
 type ProxyService struct {
 	modelIndex map[uint]int
 	mu         sync.RWMutex
 	httpClient *http.Client
 }
 
-// Proxy 全局代理实例
 var Proxy *ProxyService
 
-// InitProxy 初始化代理服务
 func InitProxy() {
 	Proxy = &ProxyService{
 		modelIndex: make(map[uint]int),
@@ -42,7 +39,6 @@ func InitProxy() {
 	}
 }
 
-// ChatCompletionResult 聊天完成结果
 type ChatCompletionResult struct {
 	StatusCode int
 	Body       []byte
@@ -51,59 +47,53 @@ type ChatCompletionResult struct {
 	Err        error
 }
 
-// HandleChatCompletion 处理聊天完成请求（支持流式和非流式）
 func (p *ProxyService) HandleChatCompletion(c *gin.Context, apiKey string, reqBody []byte) {
-	// 解析请求
 	var chatReq models.ChatCompletionRequest
 	if err := json.Unmarshal(reqBody, &chatReq); err != nil {
 		utils.RespondWithInvalidRequestError(c, "Invalid request body: "+err.Error(), nil)
 		return
 	}
 
-	// 验证请求参数
 	if err := chatReq.Validate(); err != nil {
-		validationErr := err.(*models.ValidationError)
-		param := validationErr.Param
-		utils.RespondWithInvalidRequestError(c, validationErr.Message, &param)
+		if validationErr, ok := err.(*models.ValidationError); ok {
+			param := validationErr.Param
+			utils.RespondWithInvalidRequestError(c, validationErr.Message, &param)
+		} else {
+			utils.RespondWithInvalidRequestError(c, err.Error(), nil)
+		}
 		return
 	}
 
-	// 验证 API Key
 	var apiKeyRecord models.APIKey
 	if err := models.DB.Where("key = ?", apiKey).First(&apiKeyRecord).Error; err != nil {
 		utils.RespondWithAuthenticationError(c, "Invalid API key provided")
 		return
 	}
 
-	// 获取关联的模型配置
 	var externalModel models.ExternalModel
 	if err := models.DB.Preload("Sources").First(&externalModel, apiKeyRecord.ExternalModelID).Error; err != nil {
 		utils.RespondWithNotFoundError(c, "Model not found", utils.StringPtr("model"))
 		return
 	}
 
-	// 获取活跃的数据源
 	sources := p.getActiveSources(&externalModel)
 	if len(sources) == 0 {
 		utils.RespondWithAPIError(c, http.StatusServiceUnavailable, "No available sources for this model")
 		return
 	}
 
-	// 选择数据源
 	source, sourceIndex, err := p.selectSource(&externalModel, sources)
 	if err != nil {
 		utils.RespondWithAPIError(c, http.StatusServiceUnavailable, err.Error())
 		return
 	}
 
-	// 修改请求体（替换模型名称）
 	modifiedReq, err := p.modifyRequest(reqBody, source.ModelName)
 	if err != nil {
 		utils.RespondWithInvalidRequestError(c, "Failed to modify request: "+err.Error(), nil)
 		return
 	}
 
-	// 转发请求
 	if chatReq.Stream {
 		p.handleStreamRequest(c, apiKey, modifiedReq, source, &externalModel, sources, sourceIndex, &apiKeyRecord)
 	} else {
@@ -111,7 +101,6 @@ func (p *ProxyService) HandleChatCompletion(c *gin.Context, apiKey string, reqBo
 	}
 }
 
-// handleNonStreamRequest 处理非流式请求
 func (p *ProxyService) handleNonStreamRequest(
 	c *gin.Context,
 	apiKey string,
@@ -125,18 +114,14 @@ func (p *ProxyService) handleNonStreamRequest(
 	respBody, statusCode, err := p.forwardRequestBytes(source.APIURL, source.APIKey, reqBody)
 
 	if err != nil {
-		// 记录失败
 		p.recordUsage(apiKeyRecord.ID, externalModel.ID, source.ID, externalModel.Model, 0, 0, false)
 
-		// 尝试其他数据源
 		result := p.tryOtherSources(c, apiKey, reqBody, externalModel, sources, sourceIndex, apiKeyRecord)
-		if result != nil {
+		if result == nil {
 			return
 		}
 
-		// 所有数据源都失败
 		if statusCode >= 400 {
-			// 尝试解析上游错误
 			if errResp, ok := utils.ParseUpstreamError(respBody, statusCode); ok {
 				c.JSON(statusCode, errResp)
 				return
@@ -147,7 +132,6 @@ func (p *ProxyService) handleNonStreamRequest(
 		return
 	}
 
-	// 解析响应以获取使用统计
 	var chatResp models.ChatCompletionResponse
 	var inputTokens, outputTokens int64
 
@@ -156,20 +140,16 @@ func (p *ProxyService) handleNonStreamRequest(
 		outputTokens = int64(chatResp.Usage.CompletionTokens)
 	}
 
-	// 更新使用量
 	p.updateUsage(source.ID, inputTokens+outputTokens)
 	p.recordUsage(apiKeyRecord.ID, externalModel.ID, source.ID, externalModel.Model, inputTokens, outputTokens, true)
 
-	// 更新轮询索引
 	if externalModel.Strategy == "round_robin" {
 		p.updateRoundRobinIndex(externalModel.ID, len(sources))
 	}
 
-	// 返回响应
 	c.Data(statusCode, "application/json", respBody)
 }
 
-// handleStreamRequest 处理流式请求
 func (p *ProxyService) handleStreamRequest(
 	c *gin.Context,
 	apiKey string,
@@ -183,12 +163,10 @@ func (p *ProxyService) handleStreamRequest(
 	resp, err := p.forwardRequest(source.APIURL, source.APIKey, reqBody, true)
 
 	if err != nil {
-		// 记录失败
 		p.recordUsage(apiKeyRecord.ID, externalModel.ID, source.ID, externalModel.Model, 0, 0, false)
 
-		// 尝试其他数据源（非流式降级）
 		result := p.tryOtherSources(c, apiKey, reqBody, externalModel, sources, sourceIndex, apiKeyRecord)
-		if result != nil {
+		if result == nil {
 			return
 		}
 
@@ -198,44 +176,43 @@ func (p *ProxyService) handleStreamRequest(
 
 	defer resp.Body.Close()
 
-	// 更新轮询索引
 	if externalModel.Strategy == "round_robin" {
 		p.updateRoundRobinIndex(externalModel.ID, len(sources))
 	}
 
-	// 设置流式响应头
 	c.Header("Content-Type", "text/event-stream")
 	c.Header("Cache-Control", "no-cache")
 	c.Header("Connection", "keep-alive")
 	c.Header("X-Accel-Buffering", "no")
 
-	// 流式传输数据
+	flusher, ok := c.Writer.(http.Flusher)
+	if !ok {
+		utils.RespondWithAPIError(c, http.StatusInternalServerError, "Streaming not supported")
+		return
+	}
+
+	c.Status(http.StatusOK)
+	flusher.Flush()
+
 	var totalInputTokens, totalOutputTokens int64
 	scanner := bufio.NewScanner(resp.Body)
 
-	c.Stream(func(w io.Writer) bool {
-		if !scanner.Scan() {
-			return false
-		}
-
+	for scanner.Scan() {
 		line := scanner.Text()
 
-		// 跳过空行
 		if line == "" {
-			return true
+			continue
 		}
 
-		// 处理 SSE 格式
 		if strings.HasPrefix(line, "data: ") {
 			data := strings.TrimPrefix(line, "data: ")
 
-			// 检查是否结束
 			if data == "[DONE]" {
-				w.Write([]byte("data: [DONE]\n\n"))
-				return false
+				c.Writer.Write([]byte("data: [DONE]\n\n"))
+				flusher.Flush()
+				break
 			}
 
-			// 解析流式响应以获取使用统计
 			var streamResp models.ChatCompletionStreamResponse
 			if err := json.Unmarshal([]byte(data), &streamResp); err == nil {
 				if streamResp.Usage != nil {
@@ -244,24 +221,19 @@ func (p *ProxyService) handleStreamRequest(
 				}
 			}
 
-			// 转发数据
-			w.Write([]byte(line + "\n\n"))
+			c.Writer.Write([]byte(line + "\n\n"))
+			flusher.Flush()
 		}
+	}
 
-		return true
-	})
-
-	// 记录使用量（流式请求结束后）
 	if totalInputTokens == 0 && totalOutputTokens == 0 {
-		// 如果没有获取到使用量，进行估算
-		totalOutputTokens = 1 // 流式请求至少消耗1个token
+		totalOutputTokens = 1
 	}
 
 	p.updateUsage(source.ID, totalInputTokens+totalOutputTokens)
 	p.recordUsage(apiKeyRecord.ID, externalModel.ID, source.ID, externalModel.Model, totalInputTokens, totalOutputTokens, true)
 }
 
-// tryOtherSources 尝试其他数据源
 func (p *ProxyService) tryOtherSources(
 	c *gin.Context,
 	apiKey string,
@@ -279,20 +251,17 @@ func (p *ProxyService) tryOtherSources(
 			continue
 		}
 
-		// 修改请求体
 		modifiedReq, modErr := p.modifyRequest(reqBody, nextSource.ModelName)
 		if modErr != nil {
 			continue
 		}
 
-		// 尝试转发请求
 		respBody, statusCode, err := p.forwardRequestBytes(nextSource.APIURL, nextSource.APIKey, modifiedReq)
 		if err != nil {
 			p.recordUsage(apiKeyRecord.ID, externalModel.ID, nextSource.ID, externalModel.Model, 0, 0, false)
 			continue
 		}
 
-		// 解析响应
 		var chatResp models.ChatCompletionResponse
 		var inputTokens, outputTokens int64
 
@@ -301,11 +270,9 @@ func (p *ProxyService) tryOtherSources(
 			outputTokens = int64(chatResp.Usage.CompletionTokens)
 		}
 
-		// 更新使用量
 		p.updateUsage(nextSource.ID, inputTokens+outputTokens)
 		p.recordUsage(apiKeyRecord.ID, externalModel.ID, nextSource.ID, externalModel.Model, inputTokens, outputTokens, true)
 
-		// 返回响应
 		c.Data(statusCode, "application/json", respBody)
 		return nil
 	}
@@ -313,7 +280,6 @@ func (p *ProxyService) tryOtherSources(
 	return fmt.Errorf("all upstream sources failed")
 }
 
-// selectSource 选择数据源
 func (p *ProxyService) selectSource(externalModel *models.ExternalModel, sources []models.RequestSource) (models.RequestSource, int, error) {
 	p.mu.RLock()
 	currentIndex := p.modelIndex[externalModel.ID]
@@ -326,7 +292,6 @@ func (p *ProxyService) selectSource(externalModel *models.ExternalModel, sources
 		sourceIndex = currentIndex % len(sources)
 		source = sources[sourceIndex]
 	} else {
-		// 优先策略：找到第一个可用的数据源
 		for i, s := range sources {
 			if p.isSourceAvailable(s.ID) {
 				source = s
@@ -342,21 +307,18 @@ func (p *ProxyService) selectSource(externalModel *models.ExternalModel, sources
 	return source, sourceIndex, nil
 }
 
-// updateRoundRobinIndex 更新轮询索引
 func (p *ProxyService) updateRoundRobinIndex(modelID uint, sourceCount int) {
 	p.mu.Lock()
 	p.modelIndex[modelID] = (p.modelIndex[modelID] + 1) % sourceCount
 	p.mu.Unlock()
 }
 
-// getActiveSources 获取活跃的数据源
 func (p *ProxyService) getActiveSources(model *models.ExternalModel) []models.RequestSource {
 	var sources []models.RequestSource
 	models.DB.Where("external_model_id = ? AND is_active = ?", model.ID, true).Find(&sources)
 	return sources
 }
 
-// isSourceAvailable 检查数据源是否可用
 func (p *ProxyService) isSourceAvailable(sourceID uint) bool {
 	var source models.RequestSource
 	if err := models.DB.First(&source, sourceID).Error; err != nil {
@@ -371,7 +333,6 @@ func (p *ProxyService) isSourceAvailable(sourceID uint) bool {
 	return source.LimitTokens == 0 || source.UsedTokens < source.LimitTokens
 }
 
-// checkAndResetUsage 检查并重置使用量
 func (p *ProxyService) checkAndResetUsage(source *models.RequestSource) {
 	if source.LimitResetInterval <= 0 {
 		return
@@ -395,11 +356,13 @@ func (p *ProxyService) checkAndResetUsage(source *models.RequestSource) {
 	}
 }
 
-// forwardRequest 转发请求到上游（非流式）
 func (p *ProxyService) forwardRequest(apiURL, apiKey string, reqBody []byte, isStream bool) (*http.Response, error) {
 	fullURL := apiURL
-	if !strings.HasSuffix(apiURL, "/v1/chat/completions") {
-		fullURL = strings.TrimRight(apiURL, "/") + "/v1/chat/completions"
+	apiURL = strings.TrimRight(apiURL, "/")
+	if !strings.HasSuffix(apiURL, "/v1/chat/completions") && !strings.HasSuffix(apiURL, "/v1") {
+		fullURL = apiURL + "/v1/chat/completions"
+	} else if strings.HasSuffix(apiURL, "/v1") {
+		fullURL = apiURL + "/chat/completions"
 	}
 
 	req, err := http.NewRequest("POST", fullURL, bytes.NewBuffer(reqBody))
@@ -419,7 +382,7 @@ func (p *ProxyService) forwardRequest(apiURL, apiKey string, reqBody []byte, isS
 		return nil, err
 	}
 
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode >= 400 {
 		body, _ := io.ReadAll(resp.Body)
 		resp.Body.Close()
 		return &http.Response{
@@ -432,7 +395,6 @@ func (p *ProxyService) forwardRequest(apiURL, apiKey string, reqBody []byte, isS
 	return resp, nil
 }
 
-// forwardRequestBytes 转发请求并返回字节（非流式）
 func (p *ProxyService) forwardRequestBytes(apiURL, apiKey string, reqBody []byte) ([]byte, int, error) {
 	resp, err := p.forwardRequest(apiURL, apiKey, reqBody, false)
 	if err != nil {
@@ -453,7 +415,6 @@ func (p *ProxyService) forwardRequestBytes(apiURL, apiKey string, reqBody []byte
 	return body, resp.StatusCode, nil
 }
 
-// updateUsage 更新数据源使用量
 func (p *ProxyService) updateUsage(sourceID uint, tokens int64) {
 	models.DB.Model(&models.RequestSource{}).Where("id = ?", sourceID).Updates(map[string]interface{}{
 		"used_count":  gorm.Expr("used_count + ?", 1),
@@ -461,7 +422,6 @@ func (p *ProxyService) updateUsage(sourceID uint, tokens int64) {
 	})
 }
 
-// recordUsage 记录使用记录
 func (p *ProxyService) recordUsage(apiKeyID, modelID, sourceID uint, modelName string, inputTokens, outputTokens int64, success bool) {
 	record := models.UsageRecord{
 		APIKeyID:        apiKeyID,
@@ -495,7 +455,6 @@ func (p *ProxyService) recordUsage(apiKeyID, modelID, sourceID uint, modelName s
 	}
 }
 
-// modifyRequest 修改请求体（替换模型名称）
 func (p *ProxyService) modifyRequest(reqBody []byte, modelName string) ([]byte, error) {
 	if len(reqBody) == 0 {
 		return nil, fmt.Errorf("empty request body")
@@ -520,7 +479,6 @@ func (p *ProxyService) modifyRequest(reqBody []byte, modelName string) ([]byte, 
 	return result, nil
 }
 
-// estimateTokens 估算令牌数
 func estimateTokens(messages []map[string]interface{}) int64 {
 	total := int64(0)
 	for _, msg := range messages {
