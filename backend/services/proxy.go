@@ -292,17 +292,17 @@ func (p *ProxyService) tryOtherSources(
 }
 
 func (p *ProxyService) selectSource(externalModel *models.ExternalModel, sources []models.RequestSource) (models.RequestSource, int, error) {
-	p.mu.RLock()
-	currentIndex := p.modelIndex[externalModel.ID]
-	p.mu.RUnlock()
-
 	var source models.RequestSource
 	var sourceIndex int
 
 	if externalModel.Strategy == "round_robin" {
+		p.mu.RLock()
+		currentIndex := p.modelIndex[externalModel.ID]
+		p.mu.RUnlock()
 		sourceIndex = currentIndex % len(sources)
 		source = sources[sourceIndex]
 	} else {
+		p.resetRoundRobinIndex(externalModel.ID)
 		for i, s := range sources {
 			if p.isSourceAvailable(s.ID) {
 				source = s
@@ -321,6 +321,12 @@ func (p *ProxyService) selectSource(externalModel *models.ExternalModel, sources
 func (p *ProxyService) updateRoundRobinIndex(modelID uint, sourceCount int) {
 	p.mu.Lock()
 	p.modelIndex[modelID] = (p.modelIndex[modelID] + 1) % sourceCount
+	p.mu.Unlock()
+}
+
+func (p *ProxyService) resetRoundRobinIndex(modelID uint) {
+	p.mu.Lock()
+	delete(p.modelIndex, modelID)
 	p.mu.Unlock()
 }
 
