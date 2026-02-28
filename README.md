@@ -10,6 +10,7 @@ LLM API 调用号池管理系统。该系统作为中间层代理，统一管理
   - 按次计费（限制调用次数）
   - 按 Token 计费（限制 Input+Output Token 总量）
   - 自动重置间隔配置
+  - 定时重置（指定每天固定时间重置）
 - **API Key 管理**：生成和管理客户端调用密钥，记录详细用量统计
 - **负载均衡策略**：
   - 轮询切换（Round Robin）
@@ -111,7 +112,8 @@ Excel 文件包含两个工作表：
 | BillingMode | 否 | 计费模式 (count/tokens)，默认为 count |
 | LimitCount | 否 | 调用次数限制 |
 | LimitTokens | 否 | Token 限制 |
-| LimitResetInterval | 否 | 重置间隔（秒） |
+| LimitResetInterval | 否 | 重置间隔（秒），与 LimitResetTime 二选一 |
+| LimitResetTime | 否 | 定时重置时间（HH:MM 格式，如 00:00），与 LimitResetInterval 二选一 |
 | IsActive | 否 | 是否启用 (true/false)，默认为 true |
 
 **导入规则**：

@@ -43,6 +43,7 @@ type RequestSource struct {
 	LimitCount         int64          `gorm:"default:0" json:"limit_count"`
 	LimitTokens        int64          `gorm:"default:0" json:"limit_tokens"`
 	LimitResetInterval int64          `gorm:"default:0" json:"limit_reset_interval"`
+	LimitResetTime     string         `gorm:"default:''" json:"limit_reset_time"`
 	LastResetAt        time.Time      `json:"last_reset_at"`
 	UsedCount          int64          `gorm:"default:0" json:"used_count"`
 	UsedTokens         int64          `gorm:"default:0" json:"used_tokens"`

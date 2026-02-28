@@ -566,8 +566,9 @@ async function editSource(id) {
     document.getElementById('source-key').value = source.api_key;
     document.getElementById('source-model-name').value = source.model_name;
     document.getElementById('source-billing').value = source.billing_mode;
-    document.getElementById('source-limit').value = source.billing_mode === 'count' ? source.limit_count : source.limit_tokens;
+document.getElementById('source-limit').value = source.billing_mode === 'count' ? source.limit_count : source.limit_tokens;
     document.getElementById('source-reset-interval').value = source.limit_reset_interval || '';
+    document.getElementById('source-reset-time').value = source.limit_reset_time || '';
     document.getElementById('source-modal-title').textContent = '编辑请求源';
     openModal('source-modal');
 }
@@ -601,7 +602,7 @@ document.getElementById('source-form').addEventListener('submit', async (e) => {
     const limit = parseInt(document.getElementById('source-limit').value) || 0;
     const resetInterval = parseInt(document.getElementById('source-reset-interval').value) || 0;
 
-    const data = {
+const data = {
         external_model_id: parseInt(document.getElementById('source-model-id').value),
         name: document.getElementById('source-name').value,
         api_url: document.getElementById('source-url').value,
@@ -610,7 +611,8 @@ document.getElementById('source-form').addEventListener('submit', async (e) => {
         billing_mode: billingMode,
         limit_count: billingMode === 'count' ? limit : 0,
         limit_tokens: billingMode === 'token' ? limit : 0,
-        limit_reset_interval: resetInterval
+        limit_reset_interval: resetInterval,
+        limit_reset_time: document.getElementById('source-reset-time').value.trim()
     };
 
     try {

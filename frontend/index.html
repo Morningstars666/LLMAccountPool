@@ -348,9 +348,13 @@
                         <input type="number" id="source-limit" placeholder="0 表示不限制">
                     </div>
                 </div>
-                <div class="form-group">
+<div class="form-group">
                     <label>自动重置间隔（秒）</label>
                     <input type="number" id="source-reset-interval" placeholder="0 表示不自动重置，3600 表示每小时重置一次">
+                </div>
+                <div class="form-group">
+                    <label>定时重置时间（HH:MM）</label>
+                    <input type="text" id="source-reset-time" placeholder="如 00:00 表示每天凌晨重置，与间隔二选一">
                 </div>
                 <div class="modal-actions">
                     <button type="button" class="btn btn-secondary" onclick="closeModal('source-modal')">取消</button>

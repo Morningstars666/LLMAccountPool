@@ -18,6 +18,7 @@ type RequestSourceRequest struct {
 	LimitCount         int64  `json:"limit_count"`
 	LimitTokens        int64  `json:"limit_tokens"`
 	LimitResetInterval int64  `json:"limit_reset_interval"`
+	LimitResetTime     string `json:"limit_reset_time"`
 }
 
 type UpdateSourceNameRequest struct {
@@ -70,6 +71,7 @@ func CreateRequestSource(c *gin.Context) {
 		LimitCount:         req.LimitCount,
 		LimitTokens:        req.LimitTokens,
 		LimitResetInterval: req.LimitResetInterval,
+		LimitResetTime:     req.LimitResetTime,
 		IsActive:           true,
 	}
 
@@ -105,6 +107,7 @@ func UpdateRequestSource(c *gin.Context) {
 	source.LimitCount = req.LimitCount
 	source.LimitTokens = req.LimitTokens
 	source.LimitResetInterval = req.LimitResetInterval
+	source.LimitResetTime = req.LimitResetTime
 
 	models.DB.Save(&source)
 	c.JSON(http.StatusOK, source)

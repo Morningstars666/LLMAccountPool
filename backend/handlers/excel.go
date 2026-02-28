@@ -39,7 +39,8 @@ func DownloadTemplate(c *gin.Context) {
 	f.SetCellValue("上游模型", "G1", "LimitCount")
 	f.SetCellValue("上游模型", "H1", "LimitTokens")
 	f.SetCellValue("上游模型", "I1", "LimitResetInterval")
-	f.SetCellValue("上游模型", "J1", "IsActive")
+	f.SetCellValue("上游模型", "J1", "LimitResetTime")
+	f.SetCellValue("上游模型", "K1", "IsActive")
 
 	f.SetColWidth("对外模型", "A", "A", 20)
 	f.SetColWidth("对外模型", "B", "B", 20)
@@ -53,7 +54,8 @@ func DownloadTemplate(c *gin.Context) {
 	f.SetColWidth("上游模型", "G", "G", 12)
 	f.SetColWidth("上游模型", "H", "H", 12)
 	f.SetColWidth("上游模型", "I", "I", 18)
-	f.SetColWidth("上游模型", "J", "J", 10)
+	f.SetColWidth("上游模型", "J", "J", 15)
+	f.SetColWidth("上游模型", "K", "K", 10)
 
 	c.Header("Content-Disposition", "attachment; filename=models_template.xlsx")
 	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
@@ -208,9 +210,14 @@ func ImportModelsFromExcel(c *gin.Context) {
 				}
 			}
 
-			isActive := true
+			limitResetTime := ""
 			if len(row) > 9 && strings.TrimSpace(row[9]) != "" {
-				isActive = strings.TrimSpace(row[9]) == "true" || strings.TrimSpace(row[9]) == "1" || strings.ToLower(strings.TrimSpace(row[9])) == "是"
+				limitResetTime = strings.TrimSpace(row[9])
+			}
+
+			isActive := true
+			if len(row) > 10 && strings.TrimSpace(row[10]) != "" {
+				isActive = strings.TrimSpace(row[10]) == "true" || strings.TrimSpace(row[10]) == "1" || strings.ToLower(strings.TrimSpace(row[10])) == "是"
 			}
 
 			var source models.RequestSource
@@ -225,6 +232,7 @@ func ImportModelsFromExcel(c *gin.Context) {
 					LimitCount:         limitCount,
 					LimitTokens:        limitTokens,
 					LimitResetInterval: limitResetInterval,
+					LimitResetTime:     limitResetTime,
 					IsActive:           isActive,
 				}
 				if err := models.DB.Create(&source).Error; err != nil {
@@ -240,6 +248,7 @@ func ImportModelsFromExcel(c *gin.Context) {
 				source.LimitCount = limitCount
 				source.LimitTokens = limitTokens
 				source.LimitResetInterval = limitResetInterval
+				source.LimitResetTime = limitResetTime
 				source.IsActive = isActive
 				models.DB.Save(&source)
 				result.SourcesUpdated++

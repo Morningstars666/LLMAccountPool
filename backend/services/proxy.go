@@ -53,7 +53,7 @@ func (p *ProxyService) startUsageResetTicker() {
 
 func (p *ProxyService) resetExpiredSources() {
 	var sources []models.RequestSource
-	if err := models.DB.Where("limit_reset_interval > 0").Find(&sources).Error; err != nil {
+	if err := models.DB.Where("limit_reset_interval > 0 OR limit_reset_time != ''").Find(&sources).Error; err != nil {
 		fmt.Printf("Failed to fetch sources for reset: %v\n", err)
 		return
 	}
@@ -61,6 +61,22 @@ func (p *ProxyService) resetExpiredSources() {
 	now := time.Now()
 	for i := range sources {
 		source := &sources[i]
+		if source.LimitResetTime != "" {
+			if p.shouldResetAtTime(source, now) {
+				models.DB.Model(source).Updates(map[string]interface{}{
+					"used_count":    0,
+					"used_tokens":   0,
+					"last_reset_at": now,
+				})
+				fmt.Printf("Reset usage for source %d (%s) at scheduled time\n", source.ID, source.Name)
+			}
+			continue
+		}
+
+		if source.LimitResetInterval <= 0 {
+			continue
+		}
+
 		if source.LastResetAt.IsZero() {
 			models.DB.Model(source).Updates(map[string]interface{}{
 				"last_reset_at": now,
@@ -78,6 +94,33 @@ func (p *ProxyService) resetExpiredSources() {
 			fmt.Printf("Reset usage for source %d (%s)\n", source.ID, source.Name)
 		}
 	}
+}
+
+func (p *ProxyService) shouldResetAtTime(source *models.RequestSource, now time.Time) bool {
+	if source.LimitResetTime == "" {
+		return false
+	}
+
+	resetTime, err := time.Parse("15:04", source.LimitResetTime)
+	if err != nil {
+		return false
+	}
+
+	currentTime := time.Date(2000, 1, 1, now.Hour(), now.Minute(), 0, 0, time.Local)
+	targetTime := time.Date(2000, 1, 1, resetTime.Hour(), resetTime.Minute(), 0, 0, time.Local)
+
+	if source.LastResetAt.IsZero() {
+		return currentTime.Equal(targetTime) || currentTime.After(targetTime)
+	}
+
+	lastResetDate := source.LastResetAt.Format("2006-01-02")
+	today := now.Format("2006-01-02")
+
+	if lastResetDate == today {
+		return false
+	}
+
+	return currentTime.Equal(targetTime) || currentTime.After(targetTime)
 }
 
 type ChatCompletionResult struct {
@@ -405,11 +448,26 @@ func (p *ProxyService) isSourceAvailable(sourceID uint) bool {
 }
 
 func (p *ProxyService) checkAndResetUsage(source *models.RequestSource) {
+	now := time.Now()
+
+	if source.LimitResetTime != "" {
+		if p.shouldResetAtTime(source, now) {
+			models.DB.Model(source).Updates(map[string]interface{}{
+				"used_count":    0,
+				"used_tokens":   0,
+				"last_reset_at": now,
+			})
+			source.UsedCount = 0
+			source.UsedTokens = 0
+			source.LastResetAt = now
+		}
+		return
+	}
+
 	if source.LimitResetInterval <= 0 {
 		return
 	}
 
-	now := time.Now()
 	if source.LastResetAt.IsZero() {
 		models.DB.Model(source).Updates(map[string]interface{}{
 			"last_reset_at": now,
