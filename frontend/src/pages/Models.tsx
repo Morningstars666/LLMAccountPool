@@ -464,7 +464,7 @@ const Models: React.FC = () => {
           <Form.Item name="model_name" label="上游模型名" rules={[{ required: true }]}>
             <Input placeholder="如：gpt-4" />
           </Form.Item>
-          <Space style={{ width: '100%' }}>
+          <>
             <Form.Item name="billing_mode" label="计费模式" style={{ width: '50%' }}>
               <Select style={{ width: '100%' }}>
                 <Select.Option value="count">按次</Select.Option>
@@ -474,7 +474,7 @@ const Models: React.FC = () => {
             <Form.Item name="limit" label="限额" style={{ width: '50%' }}>
               <Input type="number" placeholder="0 表示不限制" />
             </Form.Item>
-          </Space>
+          </>
           <Form.Item name="limit_reset_interval" label="自动重置间隔（秒）">
             <Input type="number" placeholder="0 表示不自动重置，3600 表示每小时重置一次" />
           </Form.Item>
