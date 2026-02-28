@@ -143,6 +143,7 @@ const Sources: React.FC = () => {
       title: '名称',
       dataIndex: 'name',
       key: 'name',
+      width: 150,
       render: (name: string, record: Source) => (
         <Space>
           <span>{name}</span>
@@ -154,34 +155,42 @@ const Sources: React.FC = () => {
       title: 'API 地址',
       dataIndex: 'api_url',
       key: 'api_url',
+      width: 200,
+      ellipsis: true,
       render: (url: string) => <code>{url}</code>,
     },
     {
       title: '模型名称',
       dataIndex: 'model_name',
       key: 'model_name',
+      width: 120,
+      ellipsis: true,
       render: (name: string) => <code>{name}</code>,
     },
     {
       title: '计费模式',
       dataIndex: 'billing_mode',
       key: 'billing_mode',
+      width: 100,
       render: (mode: string) => mode === 'count' ? '按次计费' : '按Token计费',
     },
     {
       title: '已用/限额',
       key: 'usage',
+      width: 120,
       render: (_: unknown, record: Source) => getLimitText(record),
     },
     {
       title: '上次重置',
       dataIndex: 'last_reset_at',
       key: 'last_reset_at',
+      width: 160,
       render: (text: string) => text || '-',
     },
     {
       title: '状态',
       key: 'status',
+      width: 80,
       render: (_: unknown, record: Source) => {
         const { status, color } = getStatus(record);
         return <span style={{ color: color === 'success' ? '#52c41a' : color === 'warning' ? '#faad14' : '#ff4d4f' }}>{status}</span>;
@@ -190,8 +199,9 @@ const Sources: React.FC = () => {
     {
       title: '操作',
       key: 'action',
+      width: 180,
       render: (_: unknown, record: Source) => (
-        <Space>
+        <Space size="small">
           <Button size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)}>编辑</Button>
           <Button size="small" danger icon={<DeleteOutlined />} onClick={() => handleDelete(record.id)}>删除</Button>
           <Button size="small" icon={<ReloadOutlined />} onClick={() => handleReset(record.id)}>重置</Button>
@@ -213,7 +223,7 @@ const Sources: React.FC = () => {
             添加请求源
           </Button>
         </div>
-        <Table columns={columns} dataSource={sources.map(s => ({ ...s, key: s.id }))} loading={loading} pagination={false} />
+        <Table columns={columns} dataSource={sources.map(s => ({ ...s, key: s.id }))} loading={loading} pagination={false} scroll={{ x: 'max-content' }} tableLayout="fixed" />
       </Card>
 
       <Modal
@@ -243,9 +253,9 @@ const Sources: React.FC = () => {
           </Form.Item>
           <Space style={{ width: '100%' }}>
             <Form.Item name="billing_mode" label="计费模式" style={{ width: '50%' }}>
-              <Select>
-                <Select.Option value="count">按次计费</Select.Option>
-                <Select.Option value="token">按Token计费</Select.Option>
+              <Select style={{ width: '100%' }}>
+                <Select.Option value="count">按次</Select.Option>
+                <Select.Option value="token">按Token</Select.Option>
               </Select>
             </Form.Item>
             <Form.Item name="limit" label="限额" style={{ width: '50%' }}>
