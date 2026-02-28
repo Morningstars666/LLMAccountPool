@@ -37,6 +37,47 @@ func InitProxy() {
 			},
 		},
 	}
+	Proxy.startUsageResetTicker()
+}
+
+func (p *ProxyService) startUsageResetTicker() {
+	go func() {
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+
+		for range ticker.C {
+			p.resetExpiredSources()
+		}
+	}()
+}
+
+func (p *ProxyService) resetExpiredSources() {
+	var sources []models.RequestSource
+	if err := models.DB.Where("limit_reset_interval > 0").Find(&sources).Error; err != nil {
+		fmt.Printf("Failed to fetch sources for reset: %v\n", err)
+		return
+	}
+
+	now := time.Now()
+	for i := range sources {
+		source := &sources[i]
+		if source.LastResetAt.IsZero() {
+			models.DB.Model(source).Updates(map[string]interface{}{
+				"last_reset_at": now,
+			})
+			continue
+		}
+
+		elapsed := now.Sub(source.LastResetAt).Seconds()
+		if elapsed >= float64(source.LimitResetInterval) {
+			models.DB.Model(source).Updates(map[string]interface{}{
+				"used_count":    0,
+				"used_tokens":   0,
+				"last_reset_at": now,
+			})
+			fmt.Printf("Reset usage for source %d (%s)\n", source.ID, source.Name)
+		}
+	}
 }
 
 type ChatCompletionResult struct {
@@ -370,6 +411,10 @@ func (p *ProxyService) checkAndResetUsage(source *models.RequestSource) {
 
 	now := time.Now()
 	if source.LastResetAt.IsZero() {
+		models.DB.Model(source).Updates(map[string]interface{}{
+			"last_reset_at": now,
+		})
+		source.LastResetAt = now
 		return
 	}
 
