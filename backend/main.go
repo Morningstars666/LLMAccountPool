@@ -21,10 +21,17 @@ func main() {
 
 	r.Use(middleware.CORSMiddleware(cfg))
 
-	r.Static("/static", "../frontend/dist")
+	r.Static("/assets", "../frontend/dist/assets")
+	r.StaticFile("/vite.svg", "../frontend/dist/vite.svg")
 
 	r.GET("/", func(c *gin.Context) {
 		c.File("../frontend/dist/index.html")
+	})
+
+	r.NoRoute(func(c *gin.Context) {
+		if c.Request.URL.Path[:5] != "/api/" && c.Request.URL.Path[:3] != "/v1" {
+			c.File("../frontend/dist/index.html")
+		}
 	})
 
 	r.POST("/api/login", func(c *gin.Context) {
