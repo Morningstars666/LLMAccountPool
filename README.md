@@ -22,7 +22,7 @@ LLM API 调用号池管理系统。该系统作为中间层代理，统一管理
 
 - **后端**：Go + Gin
 - **数据库**：SQLite + GORM
-- **前端**：原生 HTML/CSS/JS
+- **前端**：React + TypeScript + Ant Design + Vite
 
 ## 快速开始
 
@@ -165,10 +165,30 @@ LLMAccountPool/
 │   ├── main.go         # 入口文件
 │   └── go.mod          # Go 依赖
 ├── frontend/
-│   ├── index.html      # 前端页面
-│   ├── css/            # 样式文件
-│   └── js/             # 前端脚本
+│   ├── src/
+│   │   ├── components/  # React 组件
+│   │   ├── pages/       # 页面组件
+│   │   ├── services/    # API 服务
+│   │   ├── hooks/      # React Hooks
+│   │   ├── types/      # TypeScript 类型
+│   │   └── utils/      # 工具函数
+│   ├── dist/           # 构建输出
+│   └── vite.config.ts  # Vite 配置
 └── data/               # 数据存储
+```
+
+## 前端开发
+
+```bash
+# 安装依赖
+cd frontend
+npm install
+
+# 开发模式
+npm run dev
+
+# 生产构建
+npm run build
 ```
 
 ## 配置

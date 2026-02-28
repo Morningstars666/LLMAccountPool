@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM 账号池管理系统</title>
+    <link rel="stylesheet" href="/static/css/style.css?v={{.cssVersion}}">
+</head>
+<body>
+    <div id="login-page" class="login-container">
+        <div class="login-card">
+            <h1>LLM 账号池</h1>
+            <form id="login-form">
+                <div class="form-group">
+                    <label>用户名</label>
+                    <input type="text" id="username" placeholder="请输入用户名" required>
+                </div>
+                <div class="form-group">
+                    <label>密码</label>
+                    <input type="password" id="password" placeholder="请输入密码" required>
+                </div>
+                <button type="submit" class="btn btn-primary">登录</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="app-page" class="app-container hidden">
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                <h2>LLM 账号池</h2>
+            </div>
+            <ul class="sidebar-menu">
+                <li><a href="#" data-page="dashboard" class="active">仪表盘</a></li>
+                <li><a href="#" data-page="models">对外模型</a></li>
+                <li><a href="#" data-page="sources">请求源管理</a></li>
+                <li><a href="#" data-page="keys">API Key</a></li>
+                <li><a href="#" data-page="usage">用量统计</a></li>
+                <li><a href="#" data-page="settings">设置</a></li>
+                <li><a href="#" id="logout-btn">退出登录</a></li>
+            </ul>
+        </aside>
+
+        <main class="main-content">
+            <div id="dashboard-page" class="page">
+                <div class="page-header">
+                    <h1>仪表盘</h1>
+                    <p>系统概览与用量统计</p>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <h3>请求代理地址</h3>
+                    </div>
+                    <div class="proxy-url-container">
+                        <div class="proxy-url-box">
+                            <code id="proxy-url">加载中...</code>
+                            <button class="btn btn-secondary btn-sm" onclick="copyProxyURL()" title="复制">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="5" y="5" width="9" height="9" rx="1"></rect>
+                                    <path d="M2 11V3a1 1 0 0 1 1-1h8"></path>
+                                </svg>
+                            </button>
+                        </div>
+                        <p class="proxy-url-hint">将此地址配置为你的 API 请求地址，在请求时需要在 Header 中添加 Authorization</p>
+                    </div>
+                </div>
+                <div class="stats-grid" id="dashboard-stats">
+                    <div class="stat-card">
+                        <h4>对外模型</h4>
+                        <div class="value" id="stat-models">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <h4>请求源</h4>
+                        <div class="value" id="stat-sources">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <h4>API Keys</h4>
+                        <div class="value" id="stat-keys">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <h4>总调用次数</h4>
+                        <div class="value" id="stat-calls">0</div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <h3>模型用量详情</h3>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>模型名称</th>
+                                    <th>模型标识</th>
+                                    <th>策略</th>
+                                    <th>请求源数量</th>
+                                </tr>
+                            </thead>
+                            <tbody id="model-stats-table"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="models-page" class="page hidden">
+                <div class="page-header">
+                    <h1>对外模型</h1>
+                    <p>管理供客户端调用的模型配置</p>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <h3>模型列表</h3>
+                        <div>
+                            <button class="btn btn-secondary btn-sm" id="import-models-btn">导入xlsx</button>
+                            <button class="btn btn-primary btn-sm" id="add-model-btn">添加模型</button>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>名称</th>
+                                    <th>模型标识</th>
+                                    <th>策略</th>
+                                    <th>请求源数</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="models-table"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="sources-page" class="page hidden">
+                <div class="page-header">
+                    <h1>请求源管理</h1>
+                    <p>管理上游 LLM API 请求源</p>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <h3>请求源列表</h3>
+                        <button class="btn btn-primary btn-sm" id="add-source-btn">添加请求源</button>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>名称</th>
+                                    <th>API 地址</th>
+                                    <th>模型名称</th>
+                                    <th>计费模式</th>
+                                    <th>已用/限额</th>
+                                    <th>上次重置</th>
+                                    <th>状态</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sources-table"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="keys-page" class="page hidden">
+                <div class="page-header">
+                    <h1>API Key 管理</h1>
+                    <p>生成和管理客户端调用密钥</p>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <h3>API Key 列表</h3>
+                        <button class="btn btn-primary btn-sm" id="add-key-btn">生成 Key</button>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Key</th>
+                                    <th>备注</th>
+                                    <th>对应模型</th>
+                                    <th>调用次数</th>
+                                    <th>Input Tokens</th>
+                                    <th>Output Tokens</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="keys-table"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="usage-page" class="page hidden">
+                <div class="page-header">
+                    <h1>用量统计</h1>
+                    <p>查看详细的调用统计数据</p>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <h3>请求源用量</h3>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>请求源</th>
+                                    <th>模型</th>
+                                    <th>计费模式</th>
+                                    <th>已用次数</th>
+                                    <th>已用 Token</th>
+                                    <th>限额</th>
+                                    <th>上次重置</th>
+                                    <th>状态</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usage-sources-table"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <h3>API Key 用量</h3>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Key</th>
+                                    <th>备注</th>
+                                    <th>调用次数</th>
+                                    <th>Input Tokens</th>
+                                    <th>Output Tokens</th>
+                                    <th>总 Token</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usage-keys-table"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="settings-page" class="page hidden">
+                <div class="page-header">
+                    <h1>设置</h1>
+                    <p>修改账号密码</p>
+                </div>
+                <div class="card" style="max-width: 500px;">
+                    <h3>修改用户名</h3>
+                    <form id="change-username-form">
+                        <div class="form-group">
+                            <label>当前密码</label>
+                            <input type="password" id="username-password" required>
+                        </div>
+                        <div class="form-group">
+                            <label>新用户名</label>
+                            <input type="text" id="new-username" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">修改用户名</button>
+                    </form>
+                </div>
+                <div class="card" style="max-width: 500px;">
+                    <h3>修改密码</h3>
+                    <form id="change-password-form">
+                        <div class="form-group">
+                            <label>当前密码</label>
+                            <input type="password" id="old-password" required>
+                        </div>
+                        <div class="form-group">
+                            <label>新密码</label>
+                            <input type="password" id="new-password" required>
+                        </div>
+                        <div class="form-group">
+                            <label>确认新密码</label>
+                            <input type="password" id="confirm-password" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">修改密码</button>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div class="modal-overlay" id="model-modal">
+        <div class="modal">
+            <h2 id="model-modal-title">添加模型</h2>
+            <form id="model-form">
+                <input type="hidden" id="model-id">
+                <div class="form-group">
+                    <label>名称</label>
+                    <input type="text" id="model-name" placeholder="如：GPT-4" required>
+                </div>
+                <div class="form-group">
+                    <label>模型标识</label>
+                    <input type="text" id="model-model" placeholder="如：gpt-4" required>
+                </div>
+                <div class="form-group">
+                    <label>负载均衡策略</label>
+                    <select id="model-strategy">
+                        <option value="round_robin">轮询切换</option>
+                        <option value="sequential">用完切换</option>
+                    </select>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('model-modal')">取消</button>
+                    <button type="submit" class="btn btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="source-modal">
+        <div class="modal">
+            <h2 id="source-modal-title">添加请求源</h2>
+            <form id="source-form">
+                <input type="hidden" id="source-id">
+                <div class="form-group">
+                    <label>所属模型</label>
+                    <select id="source-model-id" required>
+                        <option value="">请选择模型</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>名称</label>
+                    <input type="text" id="source-name" placeholder="如：OpenAI API" required>
+                </div>
+                <div class="form-group">
+                    <label>API 地址</label>
+                    <input type="text" id="source-url" placeholder="如：https://api.openai.com/v1" required>
+                </div>
+                <div class="form-group">
+                    <label>API Key</label>
+                    <input type="text" id="source-key" placeholder="请输入 API Key" required>
+                </div>
+                <div class="form-group">
+                    <label>上游模型名</label>
+                    <input type="text" id="source-model-name" placeholder="如：gpt-4" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>计费模式</label>
+                        <select id="source-billing">
+                            <option value="count">按次计费</option>
+                            <option value="token">按 Token 计费</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>限额</label>
+                        <input type="number" id="source-limit" placeholder="0 表示不限制">
+                    </div>
+                </div>
+<div class="form-group">
+                    <label>自动重置间隔（秒）</label>
+                    <input type="number" id="source-reset-interval" placeholder="0 表示不自动重置，3600 表示每小时重置一次">
+                </div>
+                <div class="form-group">
+                    <label>定时重置时间（HH:MM）</label>
+                    <input type="text" id="source-reset-time" placeholder="如 00:00 表示每天凌晨重置，与间隔二选一">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('source-modal')">取消</button>
+                    <button type="submit" class="btn btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="key-modal">
+        <div class="modal">
+            <h2>生成 API Key</h2>
+            <form id="key-form">
+                <div class="form-group">
+                    <label>对应模型</label>
+                    <select id="key-model-id">
+                        <option value="">全部模型</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>备注</label>
+                    <input type="text" id="key-note" placeholder="可选备注">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('key-modal')">取消</button>
+                    <button type="submit" class="btn btn-primary">生成</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="key-display-modal">
+        <div class="modal">
+            <h2>API Key 已生成</h2>
+            <div class="api-key-display" id="new-key-display"></div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="copyNewKey()">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="5" y="5" width="9" height="9" rx="1"></rect>
+                        <path d="M2 11V3a1 1 0 0 1 1-1h8"></path>
+                    </svg>
+                    复制
+                </button>
+                <button class="btn btn-primary" onclick="closeModal('key-display-modal')">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="source-name-modal">
+        <div class="modal">
+            <h2>修改请求源名称</h2>
+            <form id="source-name-form">
+                <input type="hidden" id="source-name-id">
+                <div class="form-group">
+                    <label>新名称</label>
+                    <input type="text" id="source-name-input" placeholder="请输入新名称" required>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('source-name-modal')">取消</button>
+                    <button type="submit" class="btn btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="import-modal">
+        <div class="modal">
+            <h2>导入模型</h2>
+            <p style="margin-bottom: 15px; color: #666;">
+                请上传 xlsx 文件，支持导入对外模型和上游模型。<br>
+                <a href="javascript:void(0)" onclick="downloadTemplate()" style="color: #1890ff;">下载模板文件</a>
+            </p>
+            <form id="import-form">
+                <div class="form-group">
+                    <label>选择文件</label>
+                    <input type="file" id="import-file" accept=".xlsx,.xls" required>
+                </div>
+                <div id="import-result" class="import-result hidden"></div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('import-modal')">取消</button>
+                    <button type="submit" class="btn btn-primary">导入</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js?v={{.jsVersion}}"></script>
+</body>
+</html>
