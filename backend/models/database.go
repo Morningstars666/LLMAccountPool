@@ -4,6 +4,7 @@ import (
 	"llmaccountpool/config"
 	"llmaccountpool/utils"
 	"log"
+	"time"
 
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
@@ -24,6 +25,10 @@ func InitDB(cfg *config.Config) {
 	}
 	sqlDB.Exec("PRAGMA journal_mode=WAL")
 	sqlDB.Exec("PRAGMA busy_timeout=5000")
+
+	sqlDB.SetMaxOpenConns(25)
+	sqlDB.SetMaxIdleConns(5)
+	sqlDB.SetConnMaxLifetime(5 * time.Minute)
 
 	if err := DB.AutoMigrate(
 		&User{},

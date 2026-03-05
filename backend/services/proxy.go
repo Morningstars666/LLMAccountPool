@@ -3,6 +3,7 @@ package services
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -31,9 +32,10 @@ func InitProxy() {
 		httpClient: &http.Client{
 			Timeout: 300 * time.Second,
 			Transport: &http.Transport{
-				MaxIdleConns:        100,
-				MaxIdleConnsPerHost: 10,
-				IdleConnTimeout:     90 * time.Second,
+				MaxIdleConns:          100,
+				MaxIdleConnsPerHost:   10,
+				IdleConnTimeout:       90 * time.Second,
+				ResponseHeaderTimeout: 60 * time.Second,
 			},
 		},
 	}
@@ -203,7 +205,8 @@ func (p *ProxyService) handleNonStreamRequest(
 	sourceIndex int,
 	apiKeyRecord *models.APIKey,
 ) {
-	respBody, statusCode, err := p.forwardRequestBytes(source.APIURL, source.APIKey, reqBody)
+	ctx := c.Request.Context()
+	respBody, statusCode, err := p.forwardRequestBytes(ctx, source.APIURL, source.APIKey, reqBody)
 
 	if err != nil {
 		p.recordUsageInTransaction(models.DB, apiKeyRecord.ID, externalModel.ID, source.ID, externalModel.Model, 0, 0, false)
@@ -256,7 +259,8 @@ func (p *ProxyService) handleStreamRequest(
 	sourceIndex int,
 	apiKeyRecord *models.APIKey,
 ) {
-	resp, err := p.forwardRequest(source.APIURL, source.APIKey, reqBody, true)
+	ctx := c.Request.Context()
+	resp, err := p.forwardRequest(ctx, source.APIURL, source.APIKey, reqBody, true)
 
 	if err != nil {
 		p.recordUsageInTransaction(models.DB, apiKeyRecord.ID, externalModel.ID, source.ID, externalModel.Model, 0, 0, false)
@@ -288,12 +292,21 @@ func (p *ProxyService) handleStreamRequest(
 
 	var totalInputTokens, totalOutputTokens int64
 	scanner := bufio.NewScanner(resp.Body)
+	buf := make([]byte, 0, 64*1024)
+	scanner.Buffer(buf, 10*1024*1024)
 
 	for scanner.Scan() {
 		line := scanner.Text()
 
 		if line == "" {
 			continue
+		}
+
+		select {
+		case <-c.Request.Context().Done():
+			resp.Body.Close()
+			return
+		default:
 		}
 
 		if strings.HasPrefix(line, "data: ") {
@@ -316,6 +329,10 @@ func (p *ProxyService) handleStreamRequest(
 			c.Writer.Write([]byte(line + "\n\n"))
 			flusher.Flush()
 		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		fmt.Printf("Scanner error during streaming: %v\n", err)
 	}
 
 	if totalInputTokens == 0 && totalOutputTokens == 0 {
@@ -343,6 +360,7 @@ func (p *ProxyService) tryOtherSources(
 	failedIndex int,
 	apiKeyRecord *models.APIKey,
 ) error {
+	ctx := c.Request.Context()
 	for i := 0; i < len(sources)-1; i++ {
 		nextIndex := (failedIndex + 1 + i) % len(sources)
 		nextSource := sources[nextIndex]
@@ -356,7 +374,7 @@ func (p *ProxyService) tryOtherSources(
 			continue
 		}
 
-		respBody, statusCode, err := p.forwardRequestBytes(nextSource.APIURL, nextSource.APIKey, modifiedReq)
+		respBody, statusCode, err := p.forwardRequestBytes(ctx, nextSource.APIURL, nextSource.APIKey, modifiedReq)
 		if err != nil {
 			p.recordUsageInTransaction(models.DB, apiKeyRecord.ID, externalModel.ID, nextSource.ID, externalModel.Model, 0, 0, false)
 			continue
@@ -489,7 +507,7 @@ func (p *ProxyService) checkAndResetUsage(source *models.RequestSource) {
 	}
 }
 
-func (p *ProxyService) forwardRequest(apiURL, apiKey string, reqBody []byte, isStream bool) (*http.Response, error) {
+func (p *ProxyService) forwardRequest(ctx context.Context, apiURL, apiKey string, reqBody []byte, isStream bool) (*http.Response, error) {
 	fullURL := apiURL
 	apiURL = strings.TrimRight(apiURL, "/")
 	if !strings.HasSuffix(apiURL, "/v1/chat/completions") && !strings.HasSuffix(apiURL, "/v1") {
@@ -498,7 +516,7 @@ func (p *ProxyService) forwardRequest(apiURL, apiKey string, reqBody []byte, isS
 		fullURL = apiURL + "/chat/completions"
 	}
 
-	req, err := http.NewRequest("POST", fullURL, bytes.NewBuffer(reqBody))
+	req, err := http.NewRequestWithContext(ctx, "POST", fullURL, bytes.NewBuffer(reqBody))
 	if err != nil {
 		return nil, err
 	}
@@ -528,8 +546,8 @@ func (p *ProxyService) forwardRequest(apiURL, apiKey string, reqBody []byte, isS
 	return resp, nil
 }
 
-func (p *ProxyService) forwardRequestBytes(apiURL, apiKey string, reqBody []byte) ([]byte, int, error) {
-	resp, err := p.forwardRequest(apiURL, apiKey, reqBody, false)
+func (p *ProxyService) forwardRequestBytes(ctx context.Context, apiURL, apiKey string, reqBody []byte) ([]byte, int, error) {
+	resp, err := p.forwardRequest(ctx, apiURL, apiKey, reqBody, false)
 	if err != nil {
 		if resp != nil && resp.Body != nil {
 			body, _ := io.ReadAll(resp.Body)
