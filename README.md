@@ -26,31 +26,9 @@ LLM API 调用号池管理系统。该系统作为中间层代理，统一管理
 
 ## 快速开始
 
-> **注意**：本项目使用 SQLite 驱动时需要启用 CGO。
-
 ### 前置要求
 
 - Go 1.21+
-- **CGO 启用**（SQLite 模式必需）
-
-#### 启用 CGO
-
-```bash
-# Linux/macOS（通常默认启用）
-export CGO_ENABLED=1
-
-# Windows
-# 需要安装 GCC 编译器（推荐 MSYS2 或 TDM-GCC）
-# 然后设置：
-set CGO_ENABLED=1
-```
-
-#### 安装 GCC（Windows）
-
-1. 下载并安装 [MSYS2](https://www.msys2.org/)
-2. 安装 GCC：`pacman -S mingw-w64-x86_64-gcc`
-3. 将 `C:\msys64\mingw64\bin` 添加到系统 PATH
-4. 验证：`gcc --version`
 
 ## 环境配置
 
@@ -101,31 +79,9 @@ set CGO_ENABLED=1
 #### 使用 SQLite（默认）
 
 ```bash
-# Linux/macOS
-export CGO_ENABLED=1
 export JWT_SECRET="your-secret-key"
 cd backend
 go run main.go
-
-# Windows (PowerShell)
-$env:CGO_ENABLED="1"
-$env:JWT_SECRET="your-secret-key"
-cd backend
-go run main.go
-```
-
-> **注意**：如果编译时遇到 SQLite 相关错误，请确保已安装 GCC 并启用 CGO。
-
-#### 无 CGO 编译（仅使用 PostgreSQL/MySQL）
-
-如果无法启用 CGO，可以使用纯 Go 的 SQLite 驱动或仅使用 PostgreSQL/MySQL：
-
-```bash
-# 使用 PostgreSQL 或 MySQL 时可以不启用 CGO
-export CGO_ENABLED=0
-export DB_TYPE=postgres
-# ... 其他配置
-go build -o main .
 ```
 
 #### 使用 PostgreSQL
