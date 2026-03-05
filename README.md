@@ -21,43 +21,147 @@ LLM API 调用号池管理系统。该系统作为中间层代理，统一管理
 ## 技术栈
 
 - **后端**：Go + Gin
-- **数据库**：SQLite + GORM
+- **数据库**：SQLite / PostgreSQL / MySQL / MariaDB + GORM
 - **前端**：React + TypeScript + Ant Design + Vite
 
 ## 快速开始
 
+> **注意**：本项目使用 SQLite 驱动时需要启用 CGO。
+
+### 前置要求
+
+- Go 1.21+
+- **CGO 启用**（SQLite 模式必需）
+
+#### 启用 CGO
+
+```bash
+# Linux/macOS（通常默认启用）
+export CGO_ENABLED=1
+
+# Windows
+# 需要安装 GCC 编译器（推荐 MSYS2 或 TDM-GCC）
+# 然后设置：
+set CGO_ENABLED=1
+```
+
+#### 安装 GCC（Windows）
+
+1. 下载并安装 [MSYS2](https://www.msys2.org/)
+2. 安装 GCC：`pacman -S mingw-w64-x86_64-gcc`
+3. 将 `C:\msys64\mingw64\bin` 添加到系统 PATH
+4. 验证：`gcc --version`
+
 ## 环境配置
 
 启动前需要配置以下环境变量：
+
+### 基础配置
 
 | 环境变量 | 必填 | 默认值 | 说明 |
 |---------|------|--------|------|
 | `JWT_SECRET` | 是 | - | JWT 签名密钥，建议使用随机字符串 |
 | `SERVER_PORT` | 否 | 8080 | 服务监听端口 |
 | `SERVER_HOST` | 否 | http://localhost:8080 | 服务器地址，用于生成代理地址 |
-| `DATABASE_URL` | 否 | ../data/llmaccountpool.db | 数据库文件路径 |
 | `ALLOWED_ORIGINS` | 否 | - | 允许的跨域来源，多个用逗号分隔 |
 | `MAX_LOGIN_ATTEMPTS` | 否 | 5 | 最大登录失败次数 |
 | `LOCKOUT_DURATION` | 否 | 15 | 登录锁定时长（分钟） |
 
+### 数据库配置
+
+| 环境变量 | 必填 | 默认值 | 说明 |
+|---------|------|--------|------|
+| `DB_TYPE` | 否 | sqlite | 数据库类型：`sqlite` / `postgres` / `mysql` |
+| `DATABASE_URL` | 否 | ../data/llmaccountpool.db | SQLite 数据库文件路径（仅 SQLite 模式） |
+| `DB_HOST` | 否 | localhost | PostgreSQL/MySQL 主机地址 |
+| `DB_PORT` | 否 | 5432 | PostgreSQL/MySQL 端口（PostgreSQL 默认 5432，MySQL 默认 3306） |
+| `DB_USER` | 否 | postgres | 数据库用户名 |
+| `DB_PASSWORD` | 否 | - | 数据库密码 |
+| `DB_NAME` | 否 | llmaccountpool | 数据库名称 |
+| `DB_SSLMODE` | 否 | disable | PostgreSQL SSL 模式 |
+
+### 连接池配置（仅 PostgreSQL/MySQL）
+
+| 环境变量 | 必填 | 默认值 | 说明 |
+|---------|------|--------|------|
+| `DB_MAX_OPEN_CONNS` | 否 | 100 | 最大打开连接数 |
+| `DB_MAX_IDLE_CONNS` | 否 | 20 | 最大空闲连接数 |
+| `DB_CONN_MAX_LIFETIME` | 否 | 300 | 连接最大生命周期（秒） |
+| `DB_CONN_MAX_IDLE_TIME` | 否 | 60 | 连接最大空闲时间（秒） |
+
+### SQLite 优化配置（仅 SQLite 模式）
+
+| 环境变量 | 必填 | 默认值 | 说明 |
+|---------|------|--------|------|
+| `DB_ENABLE_WAL_MODE` | 否 | false | 启用 WAL 日志模式 |
+| `DB_BUSY_TIMEOUT` | 否 | 5000 | 忙超时时间（毫秒） |
+
 ### 启动命令
+
+#### 使用 SQLite（默认）
 
 ```bash
 # Linux/macOS
+export CGO_ENABLED=1
 export JWT_SECRET="your-secret-key"
 cd backend
 go run main.go
 
 # Windows (PowerShell)
+$env:CGO_ENABLED="1"
 $env:JWT_SECRET="your-secret-key"
 cd backend
 go run main.go
 ```
 
-或者使用 .env 文件（需自行加载）：
+> **注意**：如果编译时遇到 SQLite 相关错误，请确保已安装 GCC 并启用 CGO。
+
+#### 无 CGO 编译（仅使用 PostgreSQL/MySQL）
+
+如果无法启用 CGO，可以使用纯 Go 的 SQLite 驱动或仅使用 PostgreSQL/MySQL：
 
 ```bash
-JWT_SECRET=your-secret-key go run main.go
+# 使用 PostgreSQL 或 MySQL 时可以不启用 CGO
+export CGO_ENABLED=0
+export DB_TYPE=postgres
+# ... 其他配置
+go build -o main .
+```
+
+#### 使用 PostgreSQL
+
+```bash
+export JWT_SECRET="your-secret-key"
+export DB_TYPE=postgres
+export DB_HOST=localhost
+export DB_PORT=5432
+export DB_USER=postgres
+export DB_PASSWORD=your-password
+export DB_NAME=llmaccountpool
+cd backend
+go run main.go
+```
+
+#### 使用 MySQL / MariaDB
+
+```bash
+export JWT_SECRET="your-secret-key"
+export DB_TYPE=mysql
+export DB_HOST=localhost
+export DB_PORT=3306
+export DB_USER=root
+export DB_PASSWORD=your-password
+export DB_NAME=llmaccountpool
+cd backend
+go run main.go
+```
+
+或者使用 .env 文件：
+
+```bash
+cp .env.example .env
+# 编辑 .env 文件配置环境变量
+go run main.go
 ```
 
 ## API 接口
@@ -158,23 +262,27 @@ LLMAccountPool/
 ├── backend/
 │   ├── config/          # 配置
 │   ├── handlers/        # HTTP 处理器
-│   ├── middleware/     # 中间件
-│   ├── models/         # 数据模型
-│   ├── services/       # 业务逻辑
-│   ├── utils/          # 工具函数
-│   ├── main.go         # 入口文件
-│   └── go.mod          # Go 依赖
+│   ├── middleware/      # 中间件
+│   ├── models/          # 数据模型
+│   ├── services/        # 业务逻辑
+│   ├── utils/           # 工具函数
+│   ├── migrations/      # 数据库迁移脚本
+│   ├── main.go          # 入口文件
+│   ├── go.mod           # Go 依赖
+│   └── .env.example     # 环境变量示例
 ├── frontend/
 │   ├── src/
 │   │   ├── components/  # React 组件
 │   │   ├── pages/       # 页面组件
 │   │   ├── services/    # API 服务
-│   │   ├── hooks/      # React Hooks
-│   │   ├── types/      # TypeScript 类型
-│   │   └── utils/      # 工具函数
-│   ├── dist/           # 构建输出
-│   └── vite.config.ts  # Vite 配置
-└── data/               # 数据存储
+│   │   ├── hooks/       # React Hooks
+│   │   ├── types/       # TypeScript 类型
+│   │   └── utils/       # 工具函数
+│   ├── dist/            # 构建输出
+│   └── vite.config.ts   # Vite 配置
+├── data/                # 数据存储（SQLite 文件）
+├── README.md            # 项目说明
+└── DATABASE_MIGRATION.md # 数据库迁移指南
 ```
 
 ## 前端开发
@@ -193,12 +301,9 @@ npm run build
 
 ## 配置
 
-配置文件位于 `backend/config/config.go`，主要配置项：
+详细配置说明请参考 `backend/.env.example` 文件。
 
-- `ServerPort`: 服务端口（默认 8080）
-- `JWT_SECRET`: JWT 密钥
-- `AdminUsername`: 管理员用户名
-- `AdminPassword`: 管理员密码（Argon2id 加密存储）
+更多数据库配置和迁移指南请查看 [DATABASE_MIGRATION.md](DATABASE_MIGRATION.md)。
 
 ## License
 

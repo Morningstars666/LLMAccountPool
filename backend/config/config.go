@@ -3,17 +3,35 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
+)
+
+type DatabaseType string
+
+const (
+	SQLiteType   DatabaseType = "sqlite"
+	PostgresType DatabaseType = "postgres"
+	MySQLType    DatabaseType = "mysql"
 )
 
 type Config struct {
 	ServerPort       string
 	ServerHost       string
 	DatabaseURL      string
+	DatabaseType     DatabaseType
 	JWTSecret        string
 	AllowedOrigins   []string
 	MaxLoginAttempts int
-	LockoutDuration  int // minutes
+	LockoutDuration  int
+
+	MaxOpenConns    int
+	MaxIdleConns    int
+	ConnMaxLifetime int
+	ConnMaxIdleTime int
+
+	EnableWALMode bool
+	BusyTimeout   int
 }
 
 func LoadConfig() *Config {
@@ -31,15 +49,75 @@ func LoadConfig() *Config {
 		}
 	}
 
+	dbType := DatabaseType(strings.ToLower(getEnv("DB_TYPE", "sqlite")))
+	if dbType != SQLiteType && dbType != PostgresType && dbType != MySQLType {
+		dbType = SQLiteType
+	}
+
+	var databaseURL string
+	if dbType == SQLiteType {
+		databaseURL = getEnv("DATABASE_URL", "../data/llmaccountpool.db")
+	} else {
+		databaseURL = buildDSN(dbType)
+	}
+
+	maxOpenConns := getEnvAsInt("DB_MAX_OPEN_CONNS", 100)
+	maxIdleConns := getEnvAsInt("DB_MAX_IDLE_CONNS", 20)
+	connMaxLifetime := getEnvAsInt("DB_CONN_MAX_LIFETIME", 300)
+	connMaxIdleTime := getEnvAsInt("DB_CONN_MAX_IDLE_TIME", 60)
+
+	enableWALMode := getEnvAsBool("DB_ENABLE_WAL_MODE", false)
+	busyTimeout := getEnvAsInt("DB_BUSY_TIMEOUT", 5000)
+
 	return &Config{
 		ServerPort:       getEnv("SERVER_PORT", "8080"),
 		ServerHost:       getEnv("SERVER_HOST", "http://localhost:8080"),
-		DatabaseURL:      getEnv("DATABASE_URL", "../data/llmaccountpool.db"),
+		DatabaseURL:      databaseURL,
+		DatabaseType:     dbType,
 		JWTSecret:        jwtSecret,
 		AllowedOrigins:   allowedOrigins,
 		MaxLoginAttempts: getEnvAsInt("MAX_LOGIN_ATTEMPTS", 5),
 		LockoutDuration:  getEnvAsInt("LOCKOUT_DURATION", 15),
+
+		MaxOpenConns:    maxOpenConns,
+		MaxIdleConns:    maxIdleConns,
+		ConnMaxLifetime: connMaxLifetime,
+		ConnMaxIdleTime: connMaxIdleTime,
+
+		EnableWALMode: enableWALMode,
+		BusyTimeout:   busyTimeout,
 	}
+}
+
+func buildDSN(dbType DatabaseType) string {
+	host := getEnv("DB_HOST", "localhost")
+	port := getEnv("DB_PORT", "")
+	user := getEnv("DB_USER", "postgres")
+	password := getEnv("DB_PASSWORD", "")
+	dbname := getEnv("DB_NAME", "llmaccountpool")
+	sslmode := getEnv("DB_SSLMODE", "disable")
+
+	if dbType == PostgresType {
+		if port == "" {
+			port = "5432"
+		}
+		return fmt.Sprintf(
+			"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s TimeZone=UTC",
+			host, port, user, password, dbname, sslmode,
+		)
+	}
+
+	if dbType == MySQLType {
+		if port == "" {
+			port = "3306"
+		}
+		return fmt.Sprintf(
+			"%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=UTC",
+			user, password, host, port, dbname,
+		)
+	}
+
+	return ""
 }
 
 func getEnv(key, defaultValue string) string {
@@ -51,9 +129,23 @@ func getEnv(key, defaultValue string) string {
 
 func getEnvAsInt(key string, defaultValue int) int {
 	if value := os.Getenv(key); value != "" {
-		var intValue int
-		fmt.Sscanf(value, "%d", &intValue)
-		return intValue
+		intValue, err := strconv.Atoi(value)
+		if err == nil {
+			return intValue
+		}
+	}
+	return defaultValue
+}
+
+func getEnvAsBool(key string, defaultValue bool) bool {
+	if value := os.Getenv(key); value != "" {
+		lower := strings.ToLower(value)
+		if lower == "true" || lower == "1" || lower == "yes" {
+			return true
+		}
+		if lower == "false" || lower == "0" || lower == "no" {
+			return false
+		}
 	}
 	return defaultValue
 }

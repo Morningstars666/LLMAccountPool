@@ -1,20 +1,47 @@
 package models
 
 import (
+	"fmt"
 	"llmaccountpool/config"
 	"llmaccountpool/utils"
 	"log"
 	"time"
 
 	"github.com/glebarez/sqlite"
+	"gorm.io/driver/mysql"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 var DB *gorm.DB
 
+func getGormDialector(dbType config.DatabaseType, dsn string) gorm.Dialector {
+	switch dbType {
+	case config.PostgresType:
+		return postgres.Open(dsn)
+	case config.MySQLType:
+		return mysql.Open(dsn)
+	case config.SQLiteType:
+		fallthrough
+	default:
+		return sqlite.Open(dsn)
+	}
+}
+
 func InitDB(cfg *config.Config) {
 	var err error
-	DB, err = gorm.Open(sqlite.Open(cfg.DatabaseURL), &gorm.Config{})
+
+	log.Printf("Using database type: %s", cfg.DatabaseType)
+
+	gormConfig := &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Info),
+		NowFunc: func() time.Time {
+			return time.Now().UTC()
+		},
+	}
+
+	DB, err = gorm.Open(getGormDialector(cfg.DatabaseType, cfg.DatabaseURL), gormConfig)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
@@ -23,12 +50,43 @@ func InitDB(cfg *config.Config) {
 	if err != nil {
 		log.Fatalf("Failed to get database instance: %v", err)
 	}
-	sqlDB.Exec("PRAGMA journal_mode=WAL")
-	sqlDB.Exec("PRAGMA busy_timeout=5000")
 
-	sqlDB.SetMaxOpenConns(25)
-	sqlDB.SetMaxIdleConns(5)
-	sqlDB.SetConnMaxLifetime(5 * time.Minute)
+	switch cfg.DatabaseType {
+	case config.PostgresType, config.MySQLType:
+		sqlDB.SetMaxOpenConns(cfg.MaxOpenConns)
+		sqlDB.SetMaxIdleConns(cfg.MaxIdleConns)
+		sqlDB.SetConnMaxLifetime(time.Duration(cfg.ConnMaxLifetime) * time.Second)
+		sqlDB.SetConnMaxIdleTime(time.Duration(cfg.ConnMaxIdleTime) * time.Second)
+
+		if cfg.DatabaseType == config.PostgresType {
+			sqlDB.Exec("SET default_transaction_isolation = 'read committed'")
+			log.Println("PostgreSQL transaction isolation set to READ COMMITTED")
+		} else if cfg.DatabaseType == config.MySQLType {
+			sqlDB.Exec("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED")
+			log.Println("MySQL transaction isolation set to READ COMMITTED")
+		}
+
+		log.Printf("Connection pool configured: max_open=%d, max_idle=%d, lifetime=%ds, idle_time=%ds",
+			cfg.MaxOpenConns, cfg.MaxIdleConns, cfg.ConnMaxLifetime, cfg.ConnMaxIdleTime)
+
+	case config.SQLiteType:
+		sqlDB.SetMaxOpenConns(cfg.MaxOpenConns)
+		sqlDB.SetMaxIdleConns(cfg.MaxIdleConns)
+		sqlDB.SetConnMaxLifetime(time.Duration(cfg.ConnMaxLifetime) * time.Second)
+
+		log.Println("Applying SQLite optimizations")
+		if cfg.EnableWALMode {
+			sqlDB.Exec("PRAGMA journal_mode=WAL")
+			log.Println("WAL mode enabled")
+		}
+		if cfg.BusyTimeout > 0 {
+			sqlDB.Exec(fmt.Sprintf("PRAGMA busy_timeout=%d", cfg.BusyTimeout))
+			log.Printf("Busy timeout set to %dms", cfg.BusyTimeout)
+		}
+		sqlDB.Exec("PRAGMA synchronous=NORMAL")
+		sqlDB.Exec("PRAGMA cache_size=-64000")
+		sqlDB.Exec("PRAGMA temp_store=MEMORY")
+	}
 
 	if err := DB.AutoMigrate(
 		&User{},
