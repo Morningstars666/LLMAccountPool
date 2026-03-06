@@ -65,7 +65,7 @@ func ensureDatabase(cfg *config.Config) {
 	if cfg.DatabaseType == config.PostgresType {
 		defaultDB.Raw("SELECT COUNT(*) FROM pg_database WHERE datname = ?", dbName).Scan(&count)
 		if count == 0 {
-			defaultDB.Exec(fmt.Sprintf("CREATE DATABASE %s", dbName))
+			defaultDB.Exec(fmt.Sprintf(`CREATE DATABASE "%s"`, dbName))
 			log.Printf("Database '%s' created successfully", dbName)
 		}
 	} else if cfg.DatabaseType == config.MySQLType {
@@ -161,16 +161,68 @@ func InitDB(cfg *config.Config) {
 		log.Fatalf("Failed to migrate database: %v", err)
 	}
 
+	log.Println("Database tables migrated successfully")
+
 	var count int64
-	DB.Model(&User{}).Count(&count)
+	if err := DB.Model(&User{}).Count(&count).Error; err != nil {
+		log.Printf("CRITICAL: Failed to count users: %v", err)
+		log.Printf("This may indicate database connection or permission issues")
+		log.Printf("Attempting to continue, but default user creation may fail...")
+		count = 0
+	}
+
+	log.Printf("Current user count in database: %d", count)
+
 	if count == 0 {
-		hash, _ := utils.HashPassword("admin123")
+		log.Println("No users found, creating default admin user...")
+
+		defaultPassword := config.GetEnv("DEFAULT_ADMIN_PASSWORD", "admin123")
+		if defaultPassword == "admin123" {
+			log.Println("⚠️  Using default password 'admin123'. Set DEFAULT_ADMIN_PASSWORD environment variable for production!")
+		}
+
+		hash, err := utils.HashPassword(defaultPassword)
+		if err != nil {
+			log.Fatalf("Failed to hash default password: %v", err)
+		}
+
+		log.Printf("Password hashed successfully (length: %d bytes)", len(hash))
+
 		defaultUser := User{
 			Username: "admin",
 			Password: hash,
 		}
-		DB.Create(&defaultUser)
-		log.Println("Default admin user created: admin / admin123")
+
+		if err := DB.Create(&defaultUser).Error; err != nil {
+			log.Fatalf("Failed to create default admin user: %v", err)
+		}
+
+		log.Printf("✓ Default admin user created successfully (ID: %d)", defaultUser.ID)
+		log.Printf("  Username: admin")
+		if defaultPassword == "admin123" {
+			log.Printf("  Password: admin123 (WARNING: Change this immediately in production!)")
+		} else {
+			log.Printf("  Password: [configured via DEFAULT_ADMIN_PASSWORD]")
+		}
+
+		log.Printf("User creation audit:")
+		log.Printf("  - Timestamp: %s", time.Now().UTC().Format(time.RFC3339))
+		log.Printf("  - Action: Auto-create default admin")
+		log.Printf("  - Database type: %s", cfg.DatabaseType)
+
+		var verifyUser User
+		if err := DB.Where("username = ?", "admin").First(&verifyUser).Error; err != nil {
+			log.Printf("Warning: Failed to verify created user: %v", err)
+		} else {
+			log.Printf("✓ User verification successful - Username: %s, ID: %d", verifyUser.Username, verifyUser.ID)
+		}
+	} else {
+		log.Printf("Found %d existing user(s), skipping default user creation", count)
+
+		var firstUser User
+		if err := DB.First(&firstUser).Error; err == nil {
+			log.Printf("First user in database: %s (ID: %d)", firstUser.Username, firstUser.ID)
+		}
 	}
 
 	log.Println("Database initialized successfully")

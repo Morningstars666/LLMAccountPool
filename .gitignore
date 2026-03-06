@@ -4,6 +4,8 @@
 *.dll
 *.so
 *.dylib
+bin/
+backend/LLMPOOL
 
 # Test binary
 *.test
@@ -28,3 +30,6 @@ Thumbs.db
 data/*.db
 data/*.db-wal
 data/*.db-shm
+
+# Temporary files
+admin_hash.txt

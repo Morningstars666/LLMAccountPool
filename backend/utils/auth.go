@@ -2,6 +2,7 @@ package utils
 
 import (
 	"crypto/rand"
+	"encoding/base64"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -11,14 +12,24 @@ import (
 func HashPassword(password string) (string, error) {
 	salt := generateSalt()
 	hash := argon2.IDKey([]byte(password), salt, 1, 64*1024, 4, 32)
-	return encodeHash(salt, hash), nil
+
+	combined := make([]byte, len(salt)+len(hash))
+	copy(combined, salt)
+	copy(combined[len(salt):], hash)
+
+	encodedHash := base64.StdEncoding.EncodeToString(combined)
+	return encodedHash, nil
 }
 
 func CheckPassword(password, encodedHash string) bool {
-	salt, hash := decodeHash(encodedHash)
-	if salt == nil || hash == nil {
+	combined, err := base64.StdEncoding.DecodeString(encodedHash)
+	if err != nil || len(combined) < 16 {
 		return false
 	}
+
+	salt := combined[:16]
+	hash := combined[16:]
+
 	newHash := argon2.IDKey([]byte(password), salt, 1, 64*1024, 4, 32)
 	return string(hash) == string(newHash)
 }
@@ -30,18 +41,19 @@ func generateSalt() []byte {
 }
 
 func encodeHash(salt, hash []byte) string {
-	encoded := make([]byte, len(salt)+len(hash))
-	copy(encoded, salt)
-	copy(encoded[len(salt):], hash)
-	return string(encoded)
+	combined := make([]byte, len(salt)+len(hash))
+	copy(combined, salt)
+	copy(combined[len(salt):], hash)
+	return base64.StdEncoding.EncodeToString(combined)
 }
 
 func decodeHash(encoded string) ([]byte, []byte) {
-	if len(encoded) < 16 {
+	combined, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil || len(combined) < 16 {
 		return nil, nil
 	}
-	salt := []byte(encoded[:16])
-	hash := []byte(encoded[16:])
+	salt := combined[:16]
+	hash := combined[16:]
 	return salt, hash
 }
 

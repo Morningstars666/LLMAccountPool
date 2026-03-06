@@ -11,8 +11,8 @@ type User struct {
 	CreatedAt           time.Time      `json:"created_at"`
 	UpdatedAt           time.Time      `json:"updated_at"`
 	DeletedAt           gorm.DeletedAt `gorm:"index" json:"-"`
-	Username            string         `gorm:"unique;not null" json:"username"`
-	Password            string         `gorm:"not null" json:"-"`
+	Username            string         `gorm:"unique;not null;size:255" json:"username"`
+	Password            string         `gorm:"not null;size:255" json:"-"` // Base64 encoded Argon2 hash
 	FailedLoginAttempts int            `gorm:"default:0" json:"-"`
 	LockedUntil         *time.Time     `json:"-"`
 	LastLoginAt         *time.Time     `json:"-"`

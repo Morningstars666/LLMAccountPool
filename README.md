@@ -30,20 +30,33 @@ LLM API 调用号池管理系统。该系统作为中间层代理，统一管理
 
 - Go 1.21+
 
-## 环境配置
+### 启动步骤
 
-启动前需要配置以下环境变量：
+1. **克隆项目**
 
-### 基础配置
+2. **配置环境变量**
+   ```bash
+   cp backend/.env.example backend/.env
+   # 编辑 .env 文件，设置 JWT_SECRET 等必要配置
+   ```
 
-| 环境变量 | 必填 | 默认值 | 说明 |
-|---------|------|--------|------|
-| `JWT_SECRET` | 是 | - | JWT 签名密钥，建议使用随机字符串 |
-| `SERVER_PORT` | 否 | 8080 | 服务监听端口 |
-| `SERVER_HOST` | 否 | http://localhost:8080 | 服务器地址，用于生成代理地址 |
-| `ALLOWED_ORIGINS` | 否 | - | 允许的跨域来源，多个用逗号分隔 |
-| `MAX_LOGIN_ATTEMPTS` | 否 | 5 | 最大登录失败次数 |
-| `LOCKOUT_DURATION` | 否 | 15 | 登录锁定时长（分钟） |
+3. **启动服务**
+   ```bash
+   # 方式一：直接运行（开发环境）
+   cd backend
+   go run main.go
+
+   # 方式二：使用编译后的二进制
+   ./bin/llmaccountpool.exe
+   ```
+
+4. **访问系统**
+   - 打开浏览器访问 http://localhost:8080
+   - 使用默认账户登录：
+     - 用户名：`admin`
+     - 密码：`admin123`
+
+> ⚠️ **安全提示**：首次登录后请立即修改默认密码，或在启动前通过 `DEFAULT_ADMIN_PASSWORD` 环境变量设置安全密码。
 
 ### 数据库配置
 
@@ -73,6 +86,12 @@ LLM API 调用号池管理系统。该系统作为中间层代理，统一管理
 |---------|------|--------|------|
 | `DB_ENABLE_WAL_MODE` | 否 | false | 启用 WAL 日志模式 |
 | `DB_BUSY_TIMEOUT` | 否 | 5000 | 忙超时时间（毫秒） |
+
+### 初始用户配置
+
+| 环境变量 | 必填 | 默认值 | 说明 |
+|---------|------|--------|------|
+| `DEFAULT_ADMIN_PASSWORD` | 否 | admin123 | 首次启动时创建的默认管理员密码 |
 
 ### 启动命令
 
@@ -222,7 +241,6 @@ LLMAccountPool/
 │   ├── models/          # 数据模型
 │   ├── services/        # 业务逻辑
 │   ├── utils/           # 工具函数
-│   ├── migrations/      # 数据库迁移脚本
 │   ├── main.go          # 入口文件
 │   ├── go.mod           # Go 依赖
 │   └── .env.example     # 环境变量示例
@@ -236,9 +254,10 @@ LLMAccountPool/
 │   │   └── utils/       # 工具函数
 │   ├── dist/            # 构建输出
 │   └── vite.config.ts   # Vite 配置
+├── bin/                 # 编译后的二进制文件
 ├── data/                # 数据存储（SQLite 文件）
 ├── README.md            # 项目说明
-└── DATABASE_MIGRATION.md # 数据库迁移指南
+└── .env.example         # 环境变量示例
 ```
 
 ## 前端开发
