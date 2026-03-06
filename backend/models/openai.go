@@ -6,40 +6,40 @@ import (
 
 // ChatCompletionRequest 表示 OpenAI Chat Completions API 的请求参数
 type ChatCompletionRequest struct {
-	Model             string                 `json:"model" binding:"required"`
-	Messages          []ChatCompletionMessage `json:"messages" binding:"required,min=1"`
-	MaxTokens         *int                   `json:"max_tokens,omitempty"`
-	MaxCompletionTokens *int                 `json:"max_completion_tokens,omitempty"`
-	Temperature       *float64               `json:"temperature,omitempty"`
-	TopP              *float64               `json:"top_p,omitempty"`
-	N                 *int                   `json:"n,omitempty"`
-	Stream            bool                   `json:"stream,omitempty"`
-	StreamOptions     *StreamOptions         `json:"stream_options,omitempty"`
-	Stop              interface{}            `json:"stop,omitempty"`
-	PresencePenalty   *float64               `json:"presence_penalty,omitempty"`
-	FrequencyPenalty  *float64               `json:"frequency_penalty,omitempty"`
-	LogitBias         map[string]int         `json:"logit_bias,omitempty"`
-	User              string                 `json:"user,omitempty"`
-	Seed              *int                   `json:"seed,omitempty"`
-	Tools             []Tool                 `json:"tools,omitempty"`
-	ToolChoice        interface{}            `json:"tool_choice,omitempty"`
-	ResponseFormat    *ResponseFormat        `json:"response_format,omitempty"`
+	Model               string                  `json:"model" binding:"required"`
+	Messages            []ChatCompletionMessage `json:"messages" binding:"required,min=1"`
+	MaxTokens           *int                    `json:"max_tokens,omitempty"`
+	MaxCompletionTokens *int                    `json:"max_completion_tokens,omitempty"`
+	Temperature         *float64                `json:"temperature,omitempty"`
+	TopP                *float64                `json:"top_p,omitempty"`
+	N                   *int                    `json:"n,omitempty"`
+	Stream              bool                    `json:"stream,omitempty"`
+	StreamOptions       *StreamOptions          `json:"stream_options,omitempty"`
+	Stop                interface{}             `json:"stop,omitempty"`
+	PresencePenalty     *float64                `json:"presence_penalty,omitempty"`
+	FrequencyPenalty    *float64                `json:"frequency_penalty,omitempty"`
+	LogitBias           map[string]int          `json:"logit_bias,omitempty"`
+	User                string                  `json:"user,omitempty"`
+	Seed                *int                    `json:"seed,omitempty"`
+	Tools               []Tool                  `json:"tools,omitempty"`
+	ToolChoice          interface{}             `json:"tool_choice,omitempty"`
+	ResponseFormat      *ResponseFormat         `json:"response_format,omitempty"`
 }
 
 // ChatCompletionMessage 表示聊天消息
 type ChatCompletionMessage struct {
-	Role       string     `json:"role" binding:"required,oneof=system user assistant tool function"`
+	Role       string      `json:"role" binding:"required,oneof=system user assistant tool function"`
 	Content    interface{} `json:"content"` // string 或 []MessageContent
-	Name       string     `json:"name,omitempty"`
-	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
-	ToolCallID string     `json:"tool_call_id,omitempty"`
+	Name       string      `json:"name,omitempty"`
+	ToolCalls  []ToolCall  `json:"tool_calls,omitempty"`
+	ToolCallID string      `json:"tool_call_id,omitempty"`
 }
 
 // MessageContent 用于多模态消息内容
 type MessageContent struct {
-	Type     string          `json:"type" binding:"required,oneof=text image_url"`
-	Text     string          `json:"text,omitempty"`
-	ImageURL *ImageURL       `json:"image_url,omitempty"`
+	Type     string    `json:"type" binding:"required,oneof=text image_url"`
+	Text     string    `json:"text,omitempty"`
+	ImageURL *ImageURL `json:"image_url,omitempty"`
 }
 
 // ImageURL 表示图片URL
@@ -106,36 +106,36 @@ type ChatCompletionChoice struct {
 
 // ChatCompletionStreamResponse 表示流式响应
 type ChatCompletionStreamResponse struct {
-	ID                string                      `json:"id"`
-	Object            string                      `json:"object"`
-	Created           int64                       `json:"created"`
-	Model             string                      `json:"model"`
+	ID                string                       `json:"id"`
+	Object            string                       `json:"object"`
+	Created           int64                        `json:"created"`
+	Model             string                       `json:"model"`
 	Choices           []ChatCompletionStreamChoice `json:"choices"`
-	Usage             *Usage                      `json:"usage,omitempty"`
-	SystemFingerprint string                      `json:"system_fingerprint,omitempty"`
+	Usage             *Usage                       `json:"usage,omitempty"`
+	SystemFingerprint string                       `json:"system_fingerprint,omitempty"`
 }
 
 // ChatCompletionStreamChoice 表示流式响应选择
 type ChatCompletionStreamChoice struct {
-	Index        int                   `json:"index"`
-	Delta        ChatCompletionDelta   `json:"delta"`
-	FinishReason string                `json:"finish_reason,omitempty"`
-	Logprobs     *Logprobs             `json:"logprobs,omitempty"`
+	Index        int                 `json:"index"`
+	Delta        ChatCompletionDelta `json:"delta"`
+	FinishReason string              `json:"finish_reason,omitempty"`
+	Logprobs     *Logprobs           `json:"logprobs,omitempty"`
 }
 
 // ChatCompletionDelta 表示流式增量
 type ChatCompletionDelta struct {
-	Role       string     `json:"role,omitempty"`
-	Content    string     `json:"content,omitempty"`
-	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
+	Role      string     `json:"role,omitempty"`
+	Content   string     `json:"content,omitempty"`
+	ToolCalls []ToolCall `json:"tool_calls,omitempty"`
 }
 
 // Usage 表示令牌使用情况
 type Usage struct {
-	PromptTokens            int                     `json:"prompt_tokens"`
-	CompletionTokens        int                     `json:"completion_tokens"`
-	TotalTokens             int                     `json:"total_tokens"`
-	PromptTokensDetails     *PromptTokensDetails    `json:"prompt_tokens_details,omitempty"`
+	PromptTokens            int                      `json:"prompt_tokens"`
+	CompletionTokens        int                      `json:"completion_tokens"`
+	TotalTokens             int                      `json:"total_tokens"`
+	PromptTokensDetails     *PromptTokensDetails     `json:"prompt_tokens_details,omitempty"`
 	CompletionTokensDetails *CompletionTokensDetails `json:"completion_tokens_details,omitempty"`
 }
 
@@ -259,6 +259,20 @@ func NewValidationError(param, message string) *ValidationError {
 		Param:   param,
 		Message: message,
 	}
+}
+
+// ModelListResponse OpenAI 模型列表响应
+type ModelListResponse struct {
+	Object string       `json:"object"`
+	Data   []ModelEntry `json:"data"`
+}
+
+// ModelEntry 单个模型条目
+type ModelEntry struct {
+	ID      string `json:"id"`
+	Object  string `json:"object"`
+	Created int64  `json:"created"`
+	OwnedBy string `json:"owned_by"`
 }
 
 // UnmarshalContent 解析消息内容

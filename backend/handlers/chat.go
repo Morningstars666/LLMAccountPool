@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"io"
+	"llmaccountpool/models"
 	"llmaccountpool/services"
 	"llmaccountpool/utils"
 	"net/http"
@@ -67,9 +68,24 @@ func extractAPIKey(c *gin.Context) string {
 // HandleModels 处理 /v1/models 端点请求
 // 返回可用的模型列表（OpenAI 兼容格式）
 func HandleModels(c *gin.Context) {
-	// TODO: 实现模型列表返回
-	c.JSON(http.StatusOK, gin.H{
-		"object": "list",
-		"data":   []gin.H{},
+	var externalModels []models.ExternalModel
+	if err := models.DB.Find(&externalModels).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch models"})
+		return
+	}
+
+	modelEntries := make([]models.ModelEntry, len(externalModels))
+	for i, m := range externalModels {
+		modelEntries[i] = models.ModelEntry{
+			ID:      m.Model,
+			Object:  "model",
+			Created: m.CreatedAt.Unix(),
+			OwnedBy: "system",
+		}
+	}
+
+	c.JSON(http.StatusOK, models.ModelListResponse{
+		Object: "list",
+		Data:   modelEntries,
 	})
 }

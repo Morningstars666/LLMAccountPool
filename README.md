@@ -226,6 +226,7 @@ Excel 文件包含两个工作表：
 
 ### 代理接口
 
+- `GET /v1/models` - OpenAI 兼容的模型列表接口
 - `POST /v1/chat/completions` - OpenAI 兼容的聊天完成接口
 
 Header 中需要携带 `Authorization: Bearer <API_KEY>` 或使用查询参数 `?key=<API_KEY>`

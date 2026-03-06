@@ -83,6 +83,7 @@ func main() {
 	}
 
 	r.POST("/v1/chat/completions", handlers.HandleChatCompletions)
+	r.GET("/v1/models", handlers.HandleModels)
 
 	port := cfg.ServerPort
 
