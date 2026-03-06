@@ -49,35 +49,35 @@ func LoadConfig() *Config {
 		}
 	}
 
-	dbType := DatabaseType(strings.ToLower(getEnv("DB_TYPE", "sqlite")))
+	dbType := DatabaseType(strings.ToLower(GetEnv("DB_TYPE", "sqlite")))
 	if dbType != SQLiteType && dbType != PostgresType && dbType != MySQLType {
 		dbType = SQLiteType
 	}
 
 	var databaseURL string
 	if dbType == SQLiteType {
-		databaseURL = getEnv("DATABASE_URL", "../data/llmaccountpool.db")
+		databaseURL = GetEnv("DATABASE_URL", "../data/llmaccountpool.db")
 	} else {
 		databaseURL = buildDSN(dbType)
 	}
 
-	maxOpenConns := getEnvAsInt("DB_MAX_OPEN_CONNS", 100)
-	maxIdleConns := getEnvAsInt("DB_MAX_IDLE_CONNS", 20)
-	connMaxLifetime := getEnvAsInt("DB_CONN_MAX_LIFETIME", 300)
-	connMaxIdleTime := getEnvAsInt("DB_CONN_MAX_IDLE_TIME", 60)
+	maxOpenConns := GetEnvAsInt("DB_MAX_OPEN_CONNS", 100)
+	maxIdleConns := GetEnvAsInt("DB_MAX_IDLE_CONNS", 20)
+	connMaxLifetime := GetEnvAsInt("DB_CONN_MAX_LIFETIME", 300)
+	connMaxIdleTime := GetEnvAsInt("DB_CONN_MAX_IDLE_TIME", 60)
 
-	enableWALMode := getEnvAsBool("DB_ENABLE_WAL_MODE", false)
-	busyTimeout := getEnvAsInt("DB_BUSY_TIMEOUT", 5000)
+	enableWALMode := GetEnvAsBool("DB_ENABLE_WAL_MODE", false)
+	busyTimeout := GetEnvAsInt("DB_BUSY_TIMEOUT", 5000)
 
 	return &Config{
-		ServerPort:       getEnv("SERVER_PORT", "8080"),
-		ServerHost:       getEnv("SERVER_HOST", "http://localhost:8080"),
+		ServerPort:       GetEnv("SERVER_PORT", "8080"),
+		ServerHost:       GetEnv("SERVER_HOST", "http://localhost:8080"),
 		DatabaseURL:      databaseURL,
 		DatabaseType:     dbType,
 		JWTSecret:        jwtSecret,
 		AllowedOrigins:   allowedOrigins,
-		MaxLoginAttempts: getEnvAsInt("MAX_LOGIN_ATTEMPTS", 5),
-		LockoutDuration:  getEnvAsInt("LOCKOUT_DURATION", 15),
+		MaxLoginAttempts: GetEnvAsInt("MAX_LOGIN_ATTEMPTS", 5),
+		LockoutDuration:  GetEnvAsInt("LOCKOUT_DURATION", 15),
 
 		MaxOpenConns:    maxOpenConns,
 		MaxIdleConns:    maxIdleConns,
@@ -90,12 +90,12 @@ func LoadConfig() *Config {
 }
 
 func buildDSN(dbType DatabaseType) string {
-	host := getEnv("DB_HOST", "localhost")
-	port := getEnv("DB_PORT", "")
-	user := getEnv("DB_USER", "postgres")
-	password := getEnv("DB_PASSWORD", "")
-	dbname := getEnv("DB_NAME", "llmaccountpool")
-	sslmode := getEnv("DB_SSLMODE", "disable")
+	host := GetEnv("DB_HOST", "localhost")
+	port := GetEnv("DB_PORT", "")
+	user := GetEnv("DB_USER", "postgres")
+	password := GetEnv("DB_PASSWORD", "")
+	dbname := GetEnv("DB_NAME", "llmaccountpool")
+	sslmode := GetEnv("DB_SSLMODE", "disable")
 
 	if dbType == PostgresType {
 		if port == "" {
@@ -120,14 +120,14 @@ func buildDSN(dbType DatabaseType) string {
 	return ""
 }
 
-func getEnv(key, defaultValue string) string {
+func GetEnv(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
 	}
 	return defaultValue
 }
 
-func getEnvAsInt(key string, defaultValue int) int {
+func GetEnvAsInt(key string, defaultValue int) int {
 	if value := os.Getenv(key); value != "" {
 		intValue, err := strconv.Atoi(value)
 		if err == nil {
@@ -137,7 +137,7 @@ func getEnvAsInt(key string, defaultValue int) int {
 	return defaultValue
 }
 
-func getEnvAsBool(key string, defaultValue bool) bool {
+func GetEnvAsBool(key string, defaultValue bool) bool {
 	if value := os.Getenv(key); value != "" {
 		lower := strings.ToLower(value)
 		if lower == "true" || lower == "1" || lower == "yes" {

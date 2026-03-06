@@ -16,6 +16,67 @@ import (
 
 var DB *gorm.DB
 
+func getDefaultDatabaseDSN(dbType config.DatabaseType) string {
+	host := config.GetEnv("DB_HOST", "localhost")
+	port := config.GetEnv("DB_PORT", "")
+	user := config.GetEnv("DB_USER", "postgres")
+	password := config.GetEnv("DB_PASSWORD", "")
+	sslmode := config.GetEnv("DB_SSLMODE", "disable")
+
+	if dbType == config.PostgresType {
+		if port == "" {
+			port = "5432"
+		}
+		return fmt.Sprintf(
+			"host=%s port=%s user=%s password=%s dbname=postgres sslmode=%s TimeZone=UTC",
+			host, port, user, password, sslmode,
+		)
+	}
+
+	if dbType == config.MySQLType {
+		if port == "" {
+			port = "3306"
+		}
+		return fmt.Sprintf(
+			"%s:%s@tcp(%s:%s)/?charset=utf8mb4&parseTime=True&loc=UTC",
+			user, password, host, port,
+		)
+	}
+
+	return ""
+}
+
+func ensureDatabase(cfg *config.Config) {
+	if cfg.DatabaseType == config.SQLiteType {
+		return
+	}
+
+	defaultDSN := getDefaultDatabaseDSN(cfg.DatabaseType)
+	defaultDB, err := gorm.Open(getGormDialector(cfg.DatabaseType, defaultDSN), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Silent),
+	})
+	if err != nil {
+		log.Fatalf("Failed to connect to default database: %v", err)
+	}
+
+	dbName := config.GetEnv("DB_NAME", "llmaccountpool")
+
+	var count int64
+	if cfg.DatabaseType == config.PostgresType {
+		defaultDB.Raw("SELECT COUNT(*) FROM pg_database WHERE datname = ?", dbName).Scan(&count)
+		if count == 0 {
+			defaultDB.Exec(fmt.Sprintf("CREATE DATABASE %s", dbName))
+			log.Printf("Database '%s' created successfully", dbName)
+		}
+	} else if cfg.DatabaseType == config.MySQLType {
+		defaultDB.Exec(fmt.Sprintf("CREATE DATABASE IF NOT EXISTS `%s`", dbName))
+		log.Printf("Database '%s' ensured", dbName)
+	}
+
+	sqlDB, _ := defaultDB.DB()
+	sqlDB.Close()
+}
+
 func getGormDialector(dbType config.DatabaseType, dsn string) gorm.Dialector {
 	switch dbType {
 	case config.PostgresType:
@@ -33,6 +94,8 @@ func InitDB(cfg *config.Config) {
 	var err error
 
 	log.Printf("Using database type: %s", cfg.DatabaseType)
+
+	ensureDatabase(cfg)
 
 	gormConfig := &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Info),
